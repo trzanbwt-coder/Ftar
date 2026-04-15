@@ -1,332 +1,480 @@
-```html
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#0f172a">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>تطبيق طرزان الواقدي</title>
-    
-    <!-- Tailwind CSS -->
+    <title>تطبيق طرزان VIP</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts: Cairo -->
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Cairo', 'sans-serif'] },
-                    colors: {
-                        app: { bg: '#0b1120', card: '#1e293b', primary: '#10b981', secondary: '#3b82f6' }
-                    },
-                    animation: {
-                        'slide-up': 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-                        'fade-in': 'fadeIn 0.3s ease-out forwards',
-                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                    },
-                    keyframes: {
-                        slideUp: {
-                            '0%': { transform: 'translateY(100%)', opacity: '0' },
-                            '100%': { transform: 'translateY(0)', opacity: '1' },
-                        },
-                        fadeIn: {
-                            '0%': { opacity: '0' },
-                            '100%': { opacity: '1' },
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
-        body {
-            -webkit-tap-highlight-color: transparent;
-            background-color: #0b1120;
-            background-image: radial-gradient(circle at top right, rgba(16, 185, 129, 0.1), transparent 400px),
-                              radial-gradient(circle at bottom left, rgba(59, 130, 246, 0.1), transparent 400px);
-            background-attachment: fixed;
+        :root {
+            --primary: #10B981; /* Emerald */
+            --secondary: #8B5CF6; /* Purple */
+            --dark: #0f172a;
+            --glass: rgba(30, 41, 59, 0.7);
         }
         
-        /* إخفاء شريط التمرير لتبدو كالتطبيق */
-        ::-webkit-scrollbar { width: 0px; background: transparent; }
-        
-        .glass-panel {
-            background: rgba(30, 41, 59, 0.7);
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #020617;
+            background-image: 
+                radial-gradient(circle at top right, rgba(16, 185, 129, 0.15), transparent 40%),
+                radial-gradient(circle at bottom left, rgba(139, 92, 246, 0.15), transparent 40%);
+            color: white;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            overflow: hidden; /* لمنع التمرير العام وجعله كالتطبيق */
+        }
+
+        /* حاوية التطبيق */
+        .app-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            max-width: 600px; /* مقاس الجوال كحد أقصى في الشاشات الكبيرة */
+            margin: 0 auto;
+            background: rgba(15, 23, 42, 0.6);
+            box-shadow: 0 0 40px rgba(0,0,0,0.8);
+            position: relative;
+        }
+
+        /* التأثير الزجاجي الفخم */
+        .glass-card {
+            background: var(--glass);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
 
-        .input-field {
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid rgba(255,255,255,0.1);
+        /* المحتوى القابل للتمرير */
+        .scrollable-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            padding-bottom: 6rem; /* مساحة للشريط السفلي */
+            scrollbar-width: none; /* إخفاء شريط التمرير في فايرفوكس */
+        }
+        .scrollable-content::-webkit-scrollbar { display: none; } /* إخفاء في كروم */
+
+        /* تأثيرات التنقل بين الصفحات */
+        .page-section {
+            display: none;
+            animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .page-section.active {
+            display: block;
+        }
+
+        @keyframes slideUpFade {
+            from { opacity: 0; transform: translateY(20px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* شريط التنقل السفلي كالتطبيقات */
+        .bottom-nav {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-around;
+            padding: 0.75rem 0.5rem;
+            padding-bottom: env(safe-area-inset-bottom, 1rem); /* للايفون */
+            z-index: 50;
+        }
+
+        .nav-item {
+            color: #64748b;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
             transition: all 0.3s ease;
+            cursor: pointer;
+            width: 33%;
         }
-        .input-field:focus {
-            border-color: #10b981;
-            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+
+        .nav-item i {
+            font-size: 1.25rem;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .nav-item.active {
+            color: var(--primary);
+            text-shadow: 0 0 15px rgba(16, 185, 129, 0.5);
+        }
+
+        .nav-item.active i {
+            transform: translateY(-3px) scale(1.1);
+        }
+
+        /* حقول الإدخال */
+        .input-fakhma {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1rem;
+            padding: 1rem 1.2rem;
+            color: white;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+        .input-fakhma:focus {
             outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+            background: rgba(0, 0, 0, 0.4);
         }
 
-        /* تأثير الضغط على الأزرار كالـ Android */
-        .btn-press:active { transform: scale(0.96); }
+        /* الأزرار الفخمة */
+        .btn-vip {
+            background: linear-gradient(135deg, #10B981, #059669);
+            color: white;
+            font-weight: 700;
+            border-radius: 1rem;
+            padding: 1rem;
+            width: 100%;
+            border: none;
+            box-shadow: 0 10px 20px -10px rgba(16, 185, 129, 0.7);
+            transition: all 0.2s active;
+        }
+        .btn-vip:active { transform: scale(0.95); }
+        
+        .btn-qr {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            box-shadow: 0 10px 20px -10px rgba(59, 130, 246, 0.7);
+        }
 
-        /* Loader */
-        .loader {
-            border: 3px solid rgba(255,255,255,0.1);
-            border-left-color: #10b981;
-            border-radius: 50%;
+        /* زر التبديل (Toggle) للايفون/التطبيقات */
+        .ios-toggle {
+            position: relative;
+            width: 50px;
+            height: 28px;
+            appearance: none;
+            background: rgba(255, 255, 255, 0.1);
+            outline: none;
+            border-radius: 20px;
+            transition: 0.4s;
+            cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .ios-toggle:checked {
+            background: var(--primary);
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.5);
+        }
+        .ios-toggle::before {
+            content: '';
+            position: absolute;
             width: 24px;
             height: 24px;
-            animation: spin 1s linear infinite;
+            border-radius: 50%;
+            top: 1px;
+            left: 2px;
+            background: white;
+            transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .ios-toggle:checked::before {
+            left: calc(100% - 26px);
+        }
 
-        /* Toast notifications */
-        #toast-container {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 9999; display: flex; flex-direction: column; gap: 10px; width: 90%; max-width: 400px;
-        }
+        /* الإشعارات (Toasts) */
         .toast {
-            background: #1e293b; color: white; padding: 16px; border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5); font-weight: 600; text-align: center;
-            animation: slideUp 0.3s forwards; border-bottom: 3px solid #10b981;
+            position: absolute;
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid var(--primary);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 1rem;
+            font-weight: 600;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            z-index: 100;
+            transition: top 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            white-space: nowrap;
         }
-        .toast.error { border-bottom-color: #ef4444; }
+        .toast.show { top: 20px; }
+        .toast.error { border-color: #ef4444; }
+
+        /* شاشة التحميل للكود */
+        .radar-spinner {
+            width: 60px;
+            height: 60px;
+            border: 3px solid rgba(16, 185, 129, 0.2);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
     </style>
 </head>
-<body class="text-white h-screen flex flex-col overflow-hidden selection:bg-emerald-500 selection:text-white">
+<body>
 
-    <!-- شريط التطبيق العلوي (App Bar) -->
-    <header class="pt-10 pb-4 px-6 glass-panel rounded-b-3xl shadow-lg z-10 relative">
-        <div class="flex items-center justify-between">
-            <div>
-                <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-teal-300">
-                    طرزان الواقدي
-                </h1>
-                <p class="text-xs text-slate-400 mt-1"><i class="fa-solid fa-robot text-emerald-500 mr-1"></i> مدير جلسات الواتساب</p>
-            </div>
-            <div class="w-12 h-12 rounded-full bg-gradient-to-tr from-emerald-500 to-blue-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                <i class="fa-brands fa-whatsapp text-2xl text-white"></i>
-            </div>
-        </div>
-    </header>
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">
+        <i class="fa-solid fa-bell text-emerald-400"></i>
+        <span id="toastMsg">رسالة التنبيه</span>
+    </div>
 
-    <!-- المحتوى الرئيسي القابل للتمرير -->
-    <main class="flex-1 overflow-y-auto px-5 pt-8 pb-24 relative">
+    <!-- App Container -->
+    <div class="app-container">
         
-        <!-- قسم إنشاء الجلسة (الخطوة 1) -->
-        <div id="step1" class="glass-panel p-6 rounded-3xl shadow-xl animate-fade-in transition-all duration-300">
-            <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
-                <i class="fa-solid fa-server text-blue-400"></i> إعداد الاتصال السيرفر
-            </h2>
-            <div class="mb-5">
-                <label class="block text-sm text-slate-400 mb-2 font-semibold">اسم الجلسة (ID)</label>
-                <div class="relative">
-                    <i class="fa-solid fa-fingerprint absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-500"></i>
-                    <input type="text" id="sessionId" placeholder="مثال: session1" class="input-field w-full py-4 pr-12 pl-4 rounded-2xl text-white placeholder-slate-500 font-bold tracking-wider">
-                </div>
-            </div>
-            <button onclick="createSession()" class="btn-press w-full bg-gradient-to-r from-emerald-500 to-teal-600 py-4 rounded-2xl font-bold text-lg shadow-lg shadow-emerald-500/30 flex justify-center items-center gap-2 transition-all">
-                <span id="btnText1">إنشاء الجلسة</span>
-                <div id="loader1" class="loader hidden"></div>
-            </button>
+        <!-- Header -->
+        <div class="pt-8 pb-4 px-6 text-center z-10 bg-gradient-to-b from-slate-900 to-transparent">
+            <h1 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-200 tracking-wider">
+                طرزان VIP
+                <i class="fa-solid fa-crown text-amber-400 text-xl absolute -mt-3 ml-1 transform rotate-12 drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]"></i>
+            </h1>
+            <p class="text-xs text-emerald-500/80 mt-1 font-semibold tracking-widest uppercase">Premium Bot Interface</p>
         </div>
 
-        <!-- قسم الربط (الخطوة 2 - مخفي افتراضياً) -->
-        <div id="step2" class="hidden mt-6 animate-slide-up">
-            
-            <!-- أزرار التبديل (Tabs) -->
-            <div class="flex bg-slate-800/50 p-1 rounded-2xl mb-6">
-                <button onclick="switchTab('pairing')" id="tabPairing" class="flex-1 py-3 text-sm font-bold rounded-xl bg-slate-700 text-white shadow transition-all">رمز الاقتران</button>
-                <button onclick="switchTab('qr')" id="tabQr" class="flex-1 py-3 text-sm font-bold rounded-xl text-slate-400 transition-all">الباركود (QR)</button>
-            </div>
+        <!-- Scrollable Content Area -->
+        <div class="scrollable-content">
 
-            <!-- تبويب رمز الاقتران (التلقائي) -->
-            <div id="pairingView" class="glass-panel p-6 rounded-3xl shadow-xl">
-                <div class="text-center mb-6">
-                    <div class="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <i class="fa-solid fa-mobile-screen-button text-2xl text-blue-400 animate-pulse-slow"></i>
-                    </div>
-                    <h3 class="font-bold text-lg">الربط برقم الهاتف</h3>
-                    <p class="text-xs text-slate-400 mt-1">أدخل رقمك ليصلك كود الربط في إشعارات الواتساب</p>
+            <!-- ==================== PAGE 1: HOME (الرئيسية) ==================== -->
+            <section id="page-home" class="page-section active">
+                <div class="glass-card p-6 text-center mb-6 relative overflow-hidden">
+                    <div class="absolute -top-10 -right-10 w-24 h-24 bg-emerald-500 rounded-full blur-3xl opacity-20"></div>
+                    <img src="https://b.top4top.io/p_3489wk62d0.jpg" alt="Tarzan" class="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-emerald-500/30 object-cover shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+                    <h2 class="text-xl font-bold mb-1">أهلاً بك في نظام الإدارة</h2>
+                    <p class="text-sm text-gray-400">تحكم كامل ببوت الذكاء الاصطناعي الخاص بك.</p>
                 </div>
 
-                <div class="mb-5">
-                    <div class="relative">
-                        <i class="fa-solid fa-phone absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-500"></i>
-                        <input type="tel" id="phoneNumber" placeholder="مثال: 966500000000" class="input-field w-full py-4 pr-12 pl-4 rounded-2xl text-white placeholder-slate-500 font-bold text-left" dir="ltr">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="glass-card p-5 text-center flex flex-col items-center justify-center cursor-pointer hover:bg-slate-800/50 transition" onclick="switchPage('page-connect')">
+                        <div class="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl mb-3 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                            <i class="fa-solid fa-plug"></i>
+                        </div>
+                        <h3 class="font-bold text-sm">ربط رقم جديد</h3>
+                    </div>
+                    
+                    <div class="glass-card p-5 text-center flex flex-col items-center justify-center cursor-pointer hover:bg-slate-800/50 transition" onclick="switchPage('page-settings')">
+                        <div class="w-12 h-12 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-xl mb-3 shadow-[0_0_15px_rgba(139,92,246,0.3)]">
+                            <i class="fa-solid fa-sliders"></i>
+                        </div>
+                        <h3 class="font-bold text-sm">إعدادات الجلسات</h3>
                     </div>
                 </div>
 
-                <button onclick="getPairingCode()" class="btn-press w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-bold shadow-lg shadow-blue-500/20 flex justify-center items-center gap-2">
-                    <span id="btnText2">طلب الرمز</span>
-                    <div id="loader2" class="loader hidden"></div>
-                </button>
+                <div class="glass-card p-5 mt-4 border-l-4 border-l-amber-500">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-shield-halved text-amber-500 text-2xl"></i>
+                        <div>
+                            <h4 class="font-bold text-sm">النظام الآمن مفعل</h4>
+                            <p class="text-xs text-gray-400 mt-1">يعمل البوت بتقنية منع الحظر وحماية البيانات.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
-                <!-- عرض الرمز -->
-                <div id="codeDisplay" class="hidden mt-6 text-center">
-                    <p class="text-sm text-slate-400 mb-2">رمزك السري هو:</p>
-                    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4 flex items-center justify-between">
-                        <span id="pairCode" class="text-2xl font-black tracking-widest text-emerald-400">----</span>
-                        <button onclick="copyPairingCode()" class="btn-press bg-slate-700 p-3 rounded-xl text-white hover:bg-slate-600">
-                            <i class="fa-regular fa-copy"></i>
+            <!-- ==================== PAGE 2: CONNECT (الربط) ==================== -->
+            <section id="page-connect" class="page-section">
+                <div class="glass-card p-6 mb-6">
+                    <h2 class="text-xl font-bold mb-5 flex items-center gap-2 text-emerald-400">
+                        <i class="fa-solid fa-link"></i> بيانات الاقتران
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 mb-2 pl-2">اسم الجلسة (بالإنجليزية)</label>
+                            <input type="text" id="sessionId" placeholder="مثال: tarzan_1" class="input-fakhma">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 mb-2 pl-2">رقم الواتساب (للاقتران بالكود)</label>
+                            <input type="number" id="phoneNumber" placeholder="مثال: 966500000000" class="input-fakhma text-left" dir="ltr">
+                        </div>
+
+                        <div class="flex gap-3 pt-2">
+                            <button onclick="requestPairCode()" class="btn-vip flex-1 flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-key"></i> توليد كود
+                            </button>
+                            <button onclick="createSessionQR()" class="btn-vip btn-qr w-14 flex items-center justify-center">
+                                <i class="fa-solid fa-qrcode text-xl"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- شاشة العرض (الكود / QR / التحميل) -->
+                <div id="displayArea" class="glass-card p-8 text-center hidden flex-col items-center justify-center min-h-[200px]">
+                    
+                    <!-- التحميل -->
+                    <div id="loading" class="hidden w-full">
+                        <div class="radar-spinner"></div>
+                        <p class="text-sm text-emerald-400 mt-4 font-bold animate-pulse">جاري الاتصال بخوادم واتساب...</p>
+                        <p class="text-xs text-gray-400 mt-1">الرجاء الانتظار قليلاً</p>
+                    </div>
+
+                    <!-- كود الاقتران -->
+                    <div id="codeResult" class="hidden w-full">
+                        <p class="text-xs text-gray-400 uppercase tracking-widest mb-2">رمز الاقتران الخاص بك</p>
+                        <div class="bg-black/50 border border-emerald-500/30 rounded-xl p-4 mb-4">
+                            <h1 id="theCode" class="text-4xl font-black text-emerald-400 tracking-[0.4em] drop-shadow-[0_0_10px_rgba(16,185,129,0.5)] select-all" dir="ltr">XXXX</h1>
+                        </div>
+                        <p class="text-xs text-gray-400 leading-relaxed">افتح واتساب > الأجهزة المرتبطة > ربط جهاز > الربط برقم الهاتف</p>
+                    </div>
+
+                    <!-- QR Code -->
+                    <div id="qrResult" class="hidden w-full flex-col items-center">
+                        <p class="text-xs text-gray-400 uppercase tracking-widest mb-3">امسح الرمز بواسطة واتساب</p>
+                        <div class="bg-white p-2 rounded-xl mb-3">
+                            <img id="theQr" src="" alt="QR" class="w-40 h-40 rounded-lg">
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- ==================== PAGE 3: SETTINGS (الإعدادات) ==================== -->
+            <section id="page-settings" class="page-section">
+                <div class="glass-card p-6 mb-6">
+                    <div class="flex justify-between items-center mb-5">
+                        <h2 class="text-xl font-bold flex items-center gap-2 text-purple-400">
+                            <i class="fa-solid fa-robot"></i> الجلسات النشطة
+                        </h2>
+                        <button onclick="fetchSessions()" class="text-gray-400 hover:text-white transition bg-slate-800 p-2 rounded-lg">
+                            <i class="fa-solid fa-rotate-right"></i>
                         </button>
                     </div>
-                    <p class="text-[10px] text-emerald-500 mt-3"><i class="fa-solid fa-circle-check"></i> الرمز جاهز للنسخ، اذهب إلى إشعار الواتساب والصقه.</p>
+                    
+                    <select id="activeSessions" onchange="loadSettings()" class="input-fakhma text-center font-bold text-lg appearance-none">
+                        <option value="">-- اختر الجلسة لإدارتها --</option>
+                    </select>
                 </div>
-            </div>
 
-            <!-- تبويب الباركود -->
-            <div id="qrView" class="hidden glass-panel p-6 rounded-3xl shadow-xl text-center">
-                <h3 class="font-bold text-lg mb-2">امسح الباركود</h3>
-                <p class="text-xs text-slate-400 mb-6">افتح الأجهزة المرتبطة في واتساب وامسح الرمز المربع</p>
+                <!-- لوحة الإعدادات المخفية -->
+                <div id="settingsPanel" class="hidden space-y-4">
+                    
+                    <div class="glass-card p-5 flex justify-between items-center">
+                        <div>
+                            <h3 class="font-bold text-white text-md">التفاعل التلقائي</h3>
+                            <p class="text-xs text-gray-400 mt-1">تفاعل البوت بـ إيموجي على كل رسالة</p>
+                        </div>
+                        <input type="checkbox" id="autoReactToggle" class="ios-toggle">
+                    </div>
+
+                    <div class="glass-card p-5">
+                        <h3 class="font-bold text-white text-md mb-3">إيموجي التفاعل (React Emoji)</h3>
+                        <div class="flex gap-3">
+                            <input type="text" id="reactEmoji" value="❤️" class="input-fakhma text-center text-3xl p-2 h-16 w-full" maxlength="2">
+                            <div class="flex flex-wrap gap-2 w-full justify-center items-center">
+                                <!-- أزرار سريعة لاختيار الإيموجي -->
+                                <button onclick="document.getElementById('reactEmoji').value='❤️'" class="bg-slate-800 hover:bg-slate-700 p-2 rounded-lg text-xl transition">❤️</button>
+                                <button onclick="document.getElementById('reactEmoji').value='🔥'" class="bg-slate-800 hover:bg-slate-700 p-2 rounded-lg text-xl transition">🔥</button>
+                                <button onclick="document.getElementById('reactEmoji').value='🤖'" class="bg-slate-800 hover:bg-slate-700 p-2 rounded-lg text-xl transition">🤖</button>
+                                <button onclick="document.getElementById('reactEmoji').value='👑'" class="bg-slate-800 hover:bg-slate-700 p-2 rounded-lg text-xl transition">👑</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="saveSettings()" class="btn-vip" style="background: linear-gradient(135deg, #8B5CF6, #6D28D9); box-shadow: 0 10px 20px -10px rgba(139, 92, 246, 0.7);">
+                        <i class="fa-solid fa-floppy-disk ml-2"></i> حفظ الإعدادات
+                    </button>
+
+                </div>
                 
-                <div class="bg-white p-2 rounded-2xl inline-block mx-auto shadow-xl">
-                    <img id="qrImage" src="" alt="QR Code" class="w-48 h-48 rounded-xl opacity-0 transition-opacity duration-500">
+                <!-- رسالة إذا لم يتم اختيار جلسة -->
+                <div id="noSessionMsg" class="text-center text-gray-500 text-sm mt-10">
+                    <i class="fa-regular fa-hand-pointer text-3xl mb-3 opacity-50 block"></i>
+                    يرجى تحديد جلسة من القائمة أعلاه لعرض إعداداتها
                 </div>
+            </section>
+
+        </div>
+
+        <!-- Bottom Navigation Bar -->
+        <nav class="bottom-nav">
+            <div class="nav-item active" onclick="switchPage('page-home')" id="nav-home">
+                <i class="fa-solid fa-house"></i>
+                <span>الرئيسية</span>
             </div>
-            
-        </div>
-    </main>
+            <div class="nav-item" onclick="switchPage('page-connect')" id="nav-connect">
+                <i class="fa-solid fa-qrcode"></i>
+                <span>الربط</span>
+            </div>
+            <div class="nav-item" onclick="switchPage('page-settings')" id="nav-settings">
+                <i class="fa-solid fa-gear"></i>
+                <span>الإعدادات</span>
+            </div>
+        </nav>
 
-    <!-- شريط التنقل السفلي الوهمي (لإعطاء إحساس التطبيق) -->
-    <nav class="fixed bottom-0 w-full glass-panel pb-safe pt-3 px-6 flex justify-around items-center border-t border-slate-800">
-        <div class="flex flex-col items-center text-emerald-500">
-            <i class="fa-solid fa-link text-xl mb-1"></i>
-            <span class="text-[10px] font-bold">الربط</span>
-        </div>
-        <div class="flex flex-col items-center text-slate-500 opacity-50">
-            <i class="fa-solid fa-terminal text-xl mb-1"></i>
-            <span class="text-[10px]">الأوامر</span>
-        </div>
-        <div class="flex flex-col items-center text-slate-500 opacity-50">
-            <i class="fa-solid fa-gear text-xl mb-1"></i>
-            <span class="text-[10px]">الإعدادات</span>
-        </div>
-    </nav>
+    </div>
 
-    <!-- حاوية الإشعارات -->
-    <div id="toast-container"></div>
-
+    <!-- JavaScript Logic -->
     <script>
-        // 🚀 نظام الإشعارات (Toasts) المخصص ليحل محل Alert
-        function showToast(message, isError = false) {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast ${isError ? 'error' : ''}`;
-            toast.innerHTML = `<i class="fa-solid ${isError ? 'fa-circle-exclamation text-red-400' : 'fa-circle-check text-emerald-400'} ml-2"></i> ${message}`;
-            
-            container.appendChild(toast);
-            
-            // إضافة اهتزاز للهاتف إذا كان خطأ (مدعوم في أندرويد)
-            if(isError && navigator.vibrate) navigator.vibrate(200);
+        // 1. نظام التنقل (SPA Navigation)
+        function switchPage(pageId) {
+            // إخفاء كل الصفحات
+            document.querySelectorAll('.page-section').forEach(page => {
+                page.classList.remove('active');
+            });
+            // إظهار الصفحة المطلوبة
+            document.getElementById(pageId).classList.add('active');
 
-            setTimeout(() => {
-                toast.style.animation = 'slideUp 0.3s reverse forwards';
-                setTimeout(() => toast.remove(), 300);
-            }, 3500);
+            // تحديث حالة الأزرار السفلية
+            document.querySelectorAll('.nav-item').forEach(nav => {
+                nav.classList.remove('active');
+            });
+            const navId = pageId.replace('page-', 'nav-');
+            document.getElementById(navId).classList.add('active');
+
+            // إذا دخل لصفحة الإعدادات، جلب الجلسات تلقائياً
+            if (pageId === 'page-settings') fetchSessions();
         }
 
-        // تحكم واجهة التحميل
-        function setLoading(step, isLoading) {
-            const btnText = document.getElementById(`btnText${step}`);
-            const loader = document.getElementById(`loader${step}`);
-            if (isLoading) {
-                btnText.style.display = 'none';
-                loader.classList.remove('hidden');
+        // 2. نظام الإشعارات الفخم (Toast)
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = toast.querySelector('i');
+            document.getElementById('toastMsg').textContent = message;
+            
+            toast.classList.remove('error');
+            if (type === 'error') {
+                toast.classList.add('error');
+                icon.className = 'fa-solid fa-triangle-exclamation text-red-400';
             } else {
-                btnText.style.display = 'block';
-                loader.classList.add('hidden');
+                icon.className = 'fa-solid fa-circle-check text-emerald-400';
             }
+
+            toast.classList.add('show');
+            setTimeout(() => { toast.classList.remove('show'); }, 3500);
         }
 
-        // التبديل بين التبويبات (كود / باركود)
-        function switchTab(tab) {
-            const btnPairing = document.getElementById('tabPairing');
-            const btnQr = document.getElementById('tabQr');
-            const viewPairing = document.getElementById('pairingView');
-            const viewQr = document.getElementById('qrView');
-
-            if (tab === 'pairing') {
-                btnPairing.className = "flex-1 py-3 text-sm font-bold rounded-xl bg-slate-700 text-white shadow transition-all";
-                btnQr.className = "flex-1 py-3 text-sm font-bold rounded-xl text-slate-400 transition-all";
-                viewPairing.style.display = 'block';
-                viewQr.style.display = 'none';
-            } else {
-                btnQr.className = "flex-1 py-3 text-sm font-bold rounded-xl bg-slate-700 text-white shadow transition-all";
-                btnPairing.className = "flex-1 py-3 text-sm font-bold rounded-xl text-slate-400 transition-all";
-                viewQr.style.display = 'block';
-                viewPairing.style.display = 'none';
-            }
+        // 3. دوال التعامل مع السيرفر (API Calls)
+        function setupUIForLoading() {
+            const displayArea = document.getElementById('displayArea');
+            displayArea.classList.remove('hidden');
+            displayArea.style.display = 'flex';
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('codeResult').classList.add('hidden');
+            document.getElementById('qrResult').classList.add('hidden');
         }
 
-        // 1. إنشاء الجلسة
-        async function createSession() {
+        async function requestPairCode() {
             const sessionId = document.getElementById('sessionId').value.trim();
-            if (!sessionId) {
-                document.getElementById('sessionId').focus();
-                return showToast('الرجاء كتابة اسم الجلسة أولاً', true);
-            }
-
-            setLoading(1, true);
-
-            try {
-                const res = await fetch('/create-session', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sessionId })
-                });
-                const data = await res.json();
-
-                if (data.qr) {
-                    showToast('تم تهيئة الجلسة بنجاح');
-                    document.getElementById('step2').classList.remove('hidden');
-                    
-                    // إعداد الباركود
-                    const qrImg = document.getElementById('qrImage');
-                    qrImg.src = data.qr;
-                    qrImg.onload = () => qrImg.style.opacity = '1';
-                    
-                    // تصغير الخطوة الأولى لتوفير المساحة
-                    document.getElementById('step1').style.opacity = '0.5';
-                    document.getElementById('step1').style.transform = 'scale(0.95)';
-                    
-                    // التمرير للأسفل ليرى المستخدم الخيارات الجديدة
-                    setTimeout(() => {
-                        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-                    }, 100);
-
-                } else {
-                    showToast(data.error || data.message || 'حدث خطأ غير متوقع', true);
-                }
-            } catch (err) {
-                showToast('تعذر الاتصال بالسيرفر. تأكد من عمله.', true);
-            } finally {
-                setLoading(1, false);
-            }
-        }
-
-        // 2. طلب رمز الاقتران
-        async function getPairingCode() {
-            const sessionId = document.getElementById('sessionId').value.trim();
-            let number = document.getElementById('phoneNumber').value.trim();
+            const number = document.getElementById('phoneNumber').value.trim();
             
-            if (!number) {
-                document.getElementById('phoneNumber').focus();
-                return showToast('الرجاء إدخال رقم الواتساب', true);
-            }
+            if (!sessionId) return showToast('يرجى كتابة اسم الجلسة!', 'error');
+            if (!number) return showToast('يرجى كتابة رقم الواتساب!', 'error');
 
-            // إزالة علامة الزائد والمسافات
-            number = number.replace(/[^0-9]/g, '');
-
-            setLoading(2, true);
+            setupUIForLoading();
 
             try {
                 const res = await fetch('/pair', {
@@ -335,51 +483,132 @@
                     body: JSON.stringify({ sessionId, number })
                 });
                 const data = await res.json();
-
+                
+                document.getElementById('loading').classList.add('hidden');
+                
                 if (data.pairingCode) {
-                    // تنسيق الكود ليظهر بشكل متفرق مثلا ABCD-1234
-                    let formattedCode = data.pairingCode.match(/.{1,4}/g).join('-');
-                    document.getElementById('pairCode').innerText = formattedCode;
-                    
-                    const codeDisplay = document.getElementById('codeDisplay');
-                    codeDisplay.classList.remove('hidden');
-                    codeDisplay.classList.add('animate-slide-up');
-                    
-                    showToast('تم استخراج الرمز بنجاح!');
+                    // تحويل الكود ليكون كل حرف منفصل ليعطي شكل فخم
+                    const codeFormatted = data.pairingCode.match(/.{1,4}/g).join('-'); 
+                    document.getElementById('theCode').textContent = data.pairingCode;
+                    document.getElementById('codeResult').classList.remove('hidden');
+                    showToast('تم استخراج الكود بنجاح!');
                 } else {
-                    showToast(data.error || 'فشل في توليد الرمز، تأكد من الرقم.', true);
+                    document.getElementById('displayArea').classList.add('hidden');
+                    showToast(data.error || 'حدث خطأ غير معروف', 'error');
                 }
             } catch (err) {
-                showToast('خطأ في الاتصال بالخادم', true);
-            } finally {
-                setLoading(2, false);
+                document.getElementById('displayArea').classList.add('hidden');
+                showToast('خطأ في الاتصال بالسيرفر', 'error');
             }
         }
 
-        // 3. نسخ الرمز بالطريقة المدعومة في كل الهواتف
-        function copyPairingCode() {
-            const code = document.getElementById('pairCode').innerText.replace('-', '');
-            if (code === '----') return;
+        async function createSessionQR() {
+            const sessionId = document.getElementById('sessionId').value.trim();
+            if (!sessionId) return showToast('يرجى كتابة اسم الجلسة!', 'error');
 
-            // طريقة النسخ المتوافقة مع الـ iFrames والهواتف
-            const textArea = document.createElement("textarea");
-            textArea.value = code;
-            textArea.style.position = "fixed";
-            textArea.style.left = "-9999px";
-            document.body.appendChild(textArea);
-            textArea.select();
-            
+            setupUIForLoading();
+
             try {
-                document.execCommand('copy');
-                showToast('📋 تم نسخ الرمز! اذهب للواتساب الآن.');
+                const res = await fetch('/create-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId })
+                });
+                const data = await res.json();
+                
+                document.getElementById('loading').classList.add('hidden');
+
+                if (data.qr) {
+                    document.getElementById('theQr').src = data.qr;
+                    document.getElementById('qrResult').classList.remove('hidden');
+                    showToast('امسح الباركود الآن!');
+                } else {
+                    document.getElementById('displayArea').classList.add('hidden');
+                    showToast(data.error || 'حدث خطأ غير معروف', 'error');
+                }
             } catch (err) {
-                showToast('فشل النسخ التلقائي، قم بنسخه يدوياً.', true);
-            } finally {
-                document.body.removeChild(textArea);
+                document.getElementById('displayArea').classList.add('hidden');
+                showToast('خطأ في الاتصال', 'error');
             }
         }
+
+        async function fetchSessions() {
+            try {
+                const res = await fetch('/sessions');
+                const data = await res.json();
+                const select = document.getElementById('activeSessions');
+                
+                const currentVal = select.value; // حفظ التحديد الحالي
+                select.innerHTML = '<option value="">-- اختر الجلسة لإدارتها --</option>';
+                
+                data.sessions.forEach(session => {
+                    select.innerHTML += `<option value="${session}">${session}</option>`;
+                });
+                
+                if(currentVal && data.sessions.includes(currentVal)) {
+                    select.value = currentVal;
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function loadSettings() {
+            const sessionId = document.getElementById('activeSessions').value;
+            const panel = document.getElementById('settingsPanel');
+            const noMsg = document.getElementById('noSessionMsg');
+            
+            if (!sessionId) {
+                panel.classList.add('hidden');
+                noMsg.classList.remove('hidden');
+                return;
+            }
+
+            noMsg.classList.add('hidden');
+            panel.classList.remove('hidden');
+
+            try {
+                const res = await fetch(`/api/settings/${sessionId}`);
+                const data = await res.json();
+                
+                document.getElementById('autoReactToggle').checked = data.autoReact || false;
+                document.getElementById('reactEmoji').value = data.reactEmoji || '❤️';
+            } catch (err) {
+                showToast('فشل تحميل الإعدادات', 'error');
+            }
+        }
+
+        async function saveSettings() {
+            const sessionId = document.getElementById('activeSessions').value;
+            const autoReact = document.getElementById('autoReactToggle').checked;
+            let reactEmoji = document.getElementById('reactEmoji').value.trim();
+
+            if(!reactEmoji) reactEmoji = '❤️'; // افتراضي إذا تركه فارغ
+
+            try {
+                const res = await fetch(`/api/settings/${sessionId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ autoReact, reactEmoji })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    showToast('تم حفظ الإعدادات بنجاح 🚀');
+                } else {
+                    showToast('فشل في الحفظ', 'error');
+                }
+            } catch (err) {
+                showToast('خطأ في الاتصال بالسيرفر', 'error');
+            }
+        }
+
+        // تشغيل مبدئي
+        window.onload = () => {
+            fetchSessions();
+        };
+
     </script>
 </body>
 </html>
 
-```
