@@ -1,9 +1,4 @@
-/**
- * 👑 استخراج الميديا والوسائط المخفية (Anti-View Once)
- * 💻 تطوير وتصميم: طرزان الواقدي
- * ⚙️ الوظيفة: يعمل بمجرد ردك على الميديا بأي كلمة، بدون الحاجة لأمر محدد
- */
-const { downloadMediaMessage, jidNormalizedUser } = require('@whiskeysockets/baileys');
+const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 
 const allowedMediaTypes = [
   'imageMessage',
@@ -13,81 +8,64 @@ const allowedMediaTypes = [
   'stickerMessage',
 ];
 
-module.exports = async ({ sock, msg }) => {
-  // 1. تحديد رقم الجلسة (المالك / طرزان)
-  const sessionOwnerJid = jidNormalizedUser(sock.user.id);
-  const sender = msg.key.participant || msg.key.remoteJid;
+module.exports = async ({ sock, msg, text }) => {
+  if (text !== '🌚') return;
 
-  // 2. حماية فخمة: يعمل فقط إذا كان الرد صادر منك شخصياً، لتجنب الإزعاج من الأعضاء
-  if (sender !== sessionOwnerJid && !msg.key.fromMe) return;
+  // رقم الجلسة (صاحب البوت)
+  const sessionOwnerJid = sock.user.id.split(':')[0] + '@s.whatsapp.net';
 
-  // 3. جلب الرسالة المقتبسة (التي تم الرد عليها)
-  const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
-  if (!contextInfo || !contextInfo.quotedMessage) return; // نخرج بصمت إذا لم يكن هناك رد
-
-  let quoted = contextInfo.quotedMessage;
-
-  // 4. دعم رسائل "العرض لمرة واحدة" (View Once) واختراقها
-  const isViewOnce = quoted.viewOnceMessage || quoted.viewOnceMessageV2 || quoted.viewOnceMessageV2Extension;
-  if (isViewOnce) {
-      quoted = isViewOnce.message;
+  const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+  if (!quoted) {
+    await sock.sendMessage(msg.key.remoteJid, { text: '⚠️ يرجى الرد على رسالة تحتوي على وسائط' }, { quoted: msg });
+    return;
   }
 
-  // 5. التحقق من نوع الوسائط المقتبسة
+  // التحقق من نوع الوسائط
   const mediaType = Object.keys(quoted).find(type => allowedMediaTypes.includes(type));
-  
-  // إذا كان الرد على رسالة نصية، نخرج بصمت (بدون رسائل خطأ مزعجة)
-  if (!mediaType) return;
+  if (!mediaType) {
+    await sock.sendMessage(msg.key.remoteJid, { text: '⚠️ الوسائط غير مدعومة' }, { quoted: msg });
+    return;
+  }
 
   try {
-    // إعطاء تفاعل قيد التنفيذ للرسالة لإشعارك ببدء العمل
-    await sock.sendMessage(msg.key.remoteJid, { react: { text: '⏳', key: msg.key } });
-
-    // 6. تحميل الوسائط
     const mediaBuffer = await downloadMediaMessage(
-      { key: contextInfo, message: contextInfo.quotedMessage },
+      { key: msg.message.extendedTextMessage.contextInfo, message: quoted },
       'buffer',
       {},
       { logger: console }
     );
 
-    // 7. تحضير الرسالة مع توقيع طرزان الواقدي 👑
-    const signature = `\n\n*— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑩𝑶𝑻 ⚔️*`;
+    // تحضير الرسالة بناءً على النوع
     let sendMsg = {};
-
     switch (mediaType) {
       case 'imageMessage':
-        sendMsg = { image: mediaBuffer, caption: `*📸 تم سحب الصورة بنجاح*${signature}` };
+        sendMsg = { image: mediaBuffer, caption: '✅ تم استرجاع الصورة (عرض لمرة واحدة)' };
         break;
       case 'videoMessage':
-        sendMsg = { video: mediaBuffer, caption: `*🎥 تم سحب الفيديو بنجاح*${signature}` };
+        sendMsg = { video: mediaBuffer, caption: '✅ تم استرجاع الفيديو (عرض لمرة واحدة)' };
         break;
       case 'audioMessage':
-        // تحويل الصوت إلى بصمة صوتية (Voice Note) لزيادة الفخامة
-        sendMsg = { audio: mediaBuffer, mimetype: 'audio/mpeg', ptt: true }; 
+        sendMsg = { audio: mediaBuffer, mimetype: 'audio/mpeg', ptt: false };
         break;
       case 'documentMessage':
         sendMsg = {
           document: mediaBuffer,
           mimetype: quoted.documentMessage.mimetype,
-          fileName: quoted.documentMessage.fileName || 'Tarzan_Document',
-          caption: `*📂 تم سحب الملف*${signature}`
+          fileName: quoted.documentMessage.fileName || 'ملف_مستعاد',
         };
         break;
       case 'stickerMessage':
-        sendMsg = { sticker: mediaBuffer }; // الملصقات لا تقبل نصاً وصفياً (Caption)
+        sendMsg = { sticker: mediaBuffer };
         break;
+      default:
+        sendMsg = { text: '⚠️ نوع الوسائط غير مدعوم' };
     }
 
-    // 8. إرسال الوسائط المستخرجة إلى رقمك فقط
+    // إرسال الوسائط إلى رقم الجلسة فقط
     await sock.sendMessage(sessionOwnerJid, sendMsg);
-
-    // تفاعل بالنجاح لتأكيد الإرسال
-    await sock.sendMessage(msg.key.remoteJid, { react: { text: '✅', key: msg.key } });
 
   } catch (error) {
     console.error('❌ خطأ في استعادة الوسائط:', error);
-    // إشعار بالخطأ في حال فشل التحميل
-    await sock.sendMessage(msg.key.remoteJid, { react: { text: '❌', key: msg.key } });
+    await sock.sendMessage(msg.key.remoteJid, { text: '❌ حدث خطأ أثناء استرجاع الوسائط' }, { quoted: msg });
   }
 };
