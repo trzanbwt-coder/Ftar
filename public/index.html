@@ -1,8 +1,8 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <!-- إعدادات الشاشة الأساسية لمنع التكبير العشوائي والتكيف مع التطبيقات -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#020617">
     <title>إدارة طرزان VIP</title>
@@ -23,21 +23,19 @@
             font-family: 'Cairo', sans-serif;
             background-color: #020617;
             background-image: 
-                radial-gradient(circle at 15% 50%, rgba(16, 185, 129, 0.08), transparent 25%),
-                radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.08), transparent 25%);
+                radial-gradient(circle at 10% 20%, rgba(16, 185, 129, 0.1), transparent 30%),
+                radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.1), transparent 30%);
             color: white;
             margin: 0;
             padding: 0;
             display: flex;
             justify-content: center;
             align-items: center;
-            /* استخدمنا الارتفاع الديناميكي لحل مشكلة اختفاء الأزرار */
             min-height: 100vh;
             min-height: 100dvh; 
             overflow: hidden;
         }
 
-        /* الحاوية الرئيسية (شكل الهاتف على الكمبيوتر، وشاشة كاملة على الجوال) */
         .app-wrapper {
             position: relative;
             width: 100%;
@@ -46,57 +44,55 @@
             display: flex;
             flex-direction: column;
             background: var(--glass);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
             overflow: hidden;
         }
 
-        /* استعلام الشاشات الكبيرة (تابلت/كمبيوتر) */
         @media (min-width: 768px) {
             body { background-size: cover; }
             .app-wrapper {
-                width: 400px;
+                width: 420px;
                 height: 85vh;
-                max-height: 850px;
+                max-height: 880px;
                 border-radius: 2.5rem;
                 border: 1px solid var(--glass-border);
-                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 0 10px rgba(255,255,255,0.02);
+                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 0 12px rgba(255,255,255,0.02);
             }
             .bottom-nav { border-radius: 0 0 2.5rem 2.5rem; }
         }
 
-        /* منطقة المحتوى القابلة للتمرير */
         .content-area {
             flex: 1;
             overflow-y: auto;
             overflow-x: hidden;
             padding: 1.5rem;
-            /* المساحة السفلية ضرورية جداً لكي لا يختفي المحتوى خلف الأزرار */
-            padding-bottom: calc(80px + env(safe-area-inset-bottom));
+            padding-bottom: calc(90px + env(safe-area-inset-bottom));
             scrollbar-width: none;
         }
         .content-area::-webkit-scrollbar { display: none; }
 
-        /* البطاقات الزجاجية الداخلية */
         .glass-card {
-            background: rgba(30, 41, 59, 0.5);
+            background: rgba(30, 41, 59, 0.6);
             border: 1px solid var(--glass-border);
             border-radius: 1.5rem;
-            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
-            transition: transform 0.3s ease;
+            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05), 0 8px 20px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
         }
 
-        /* شريط التنقل السفلي الفخم الثابت */
+        /* شريط التنقل السفلي */
         .bottom-nav {
             position: absolute;
             bottom: 0;
             left: 0;
             right: 0;
-            height: calc(70px + env(safe-area-inset-bottom));
-            background: rgba(15, 23, 42, 0.9);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            height: calc(75px + env(safe-area-inset-bottom));
+            background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
             display: flex;
             justify-content: space-around;
             align-items: center;
@@ -120,28 +116,24 @@
         }
 
         .nav-item i {
-            font-size: 1.3rem;
-            margin-bottom: 4px;
+            font-size: 1.4rem;
+            margin-bottom: 5px;
             transition: all 0.4s ease;
         }
 
-        /* تأثير التفعيل للزر السفلي */
-        .nav-item.active {
-            color: white;
-        }
+        .nav-item.active { color: white; }
         .nav-item.active i {
             color: var(--primary);
-            transform: translateY(-4px) scale(1.15);
-            text-shadow: 0 0 15px var(--primary-glow);
+            transform: translateY(-5px) scale(1.15);
+            text-shadow: 0 0 20px var(--primary-glow);
         }
         
-        /* نقطة مضيئة تظهر تحت الزر المفعل */
         .nav-item::after {
             content: '';
             position: absolute;
-            bottom: 10px;
-            width: 4px;
-            height: 4px;
+            bottom: 12px;
+            width: 5px;
+            height: 5px;
             border-radius: 50%;
             background: var(--primary);
             opacity: 0;
@@ -151,10 +143,9 @@
         .nav-item.active::after {
             opacity: 1;
             transform: translateY(0);
-            box-shadow: 0 0 10px var(--primary);
+            box-shadow: 0 0 12px var(--primary);
         }
 
-        /* تأثيرات الانتقال بين الصفحات */
         .page-section {
             display: none;
             animation: fadeInScale 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -162,57 +153,76 @@
         .page-section.active { display: block; }
 
         @keyframes fadeInScale {
-            0% { opacity: 0; transform: scale(0.97) translateY(10px); }
+            0% { opacity: 0; transform: scale(0.96) translateY(15px); }
             100% { opacity: 1; transform: scale(1) translateY(0); }
         }
 
-        /* حقول الإدخال */
+        /* حقول الإدخال الفخمة المزودة بأيقونات */
+        .input-group {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .input-group i {
+            position: absolute;
+            right: 1rem;
+            color: #64748b;
+            font-size: 1.1rem;
+            transition: color 0.3s;
+        }
         .input-vip {
             width: 100%;
-            background: rgba(0, 0, 0, 0.3);
+            background: rgba(0, 0, 0, 0.4);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 1rem;
-            padding: 1rem 1.2rem;
+            border-radius: 1.2rem;
+            padding: 1.1rem 1.1rem 1.1rem 2.5rem;
+            padding-right: 2.8rem;
             color: white;
             font-size: 0.95rem;
+            font-weight: 600;
             transition: all 0.3s;
         }
         .input-vip:focus {
             outline: none;
             border-color: var(--primary);
-            box-shadow: inset 0 0 0 1px var(--primary), 0 0 15px rgba(16, 185, 129, 0.1);
-            background: rgba(0, 0, 0, 0.5);
+            box-shadow: inset 0 0 0 1px var(--primary), 0 0 20px rgba(16, 185, 129, 0.15);
+            background: rgba(0, 0, 0, 0.6);
         }
+        .input-vip:focus + i { color: var(--primary); }
 
-        /* الأزرار الفخمة */
         .btn-action {
             background: linear-gradient(135deg, #10B981, #059669);
             color: white;
-            font-weight: 700;
-            border-radius: 1rem;
-            padding: 1rem;
+            font-weight: 800;
+            border-radius: 1.2rem;
+            padding: 1.1rem;
             border: none;
             cursor: pointer;
-            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+            box-shadow: 0 8px 20px -5px rgba(16, 185, 129, 0.4);
             transition: all 0.2s;
             position: relative;
             overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
         }
-        .btn-action:active { transform: scale(0.96); }
-        .btn-qr { background: linear-gradient(135deg, #3b82f6, #2563eb); box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3); }
-        .btn-purple { background: linear-gradient(135deg, #8B5CF6, #6D28D9); box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3); }
+        .btn-action:active { transform: scale(0.95); }
+        .btn-qr { background: linear-gradient(135deg, #3b82f6, #2563eb); box-shadow: 0 8px 20px -5px rgba(59, 130, 246, 0.4); }
+        .btn-purple { background: linear-gradient(135deg, #8B5CF6, #6D28D9); box-shadow: 0 8px 20px -5px rgba(139, 92, 246, 0.4); }
+        .btn-danger { background: linear-gradient(135deg, #ef4444, #b91c1c); box-shadow: 0 8px 20px -5px rgba(239, 68, 68, 0.4); }
 
         /* زر التبديل iOS Style */
         .toggle-switch {
             position: relative;
-            width: 52px;
-            height: 30px;
+            width: 54px;
+            height: 32px;
             appearance: none;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.4);
             border-radius: 20px;
             cursor: pointer;
             transition: 0.4s;
-            border: 1px solid rgba(255,255,255,0.05);
+            border: 2px solid rgba(255,255,255,0.05);
         }
         .toggle-switch:checked {
             background: var(--primary);
@@ -222,49 +232,46 @@
         .toggle-switch::before {
             content: '';
             position: absolute;
-            width: 26px;
-            height: 26px;
+            width: 24px;
+            height: 24px;
             border-radius: 50%;
-            top: 1px;
-            left: 2px;
+            top: 2px;
+            left: 3px;
             background: white;
             transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
         }
-        .toggle-switch:checked::before { left: calc(100% - 28px); }
+        .toggle-switch:checked::before { left: calc(100% - 27px); }
 
-        /* الإشعارات Toast العائمة */
         .toast-msg {
             position: absolute;
             top: -100px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(15, 23, 42, 0.95);
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(15px);
             border: 1px solid var(--primary);
             color: white;
-            padding: 0.8rem 1.5rem;
+            padding: 1rem 1.5rem;
             border-radius: 2rem;
             font-size: 0.9rem;
-            font-weight: 700;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            font-weight: 800;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.6);
             z-index: 999;
             transition: top 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.7rem;
             width: max-content;
             max-width: 90%;
         }
         .toast-msg.show { top: max(20px, env(safe-area-inset-top)); }
         .toast-msg.error { border-color: #ef4444; }
-        .toast-msg.error i { color: #ef4444 !important; }
 
-        /* Loader */
         .spinner {
-            width: 50px;
-            height: 50px;
-            border: 3px solid rgba(16, 185, 129, 0.1);
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(16, 185, 129, 0.1);
             border-top-color: var(--primary);
             border-radius: 50%;
             animation: spin 1s ease-in-out infinite;
@@ -277,171 +284,240 @@
 
     <!-- التنبيهات العائمة -->
     <div id="toast" class="toast-msg">
-        <i class="fa-solid fa-circle-check text-emerald-400"></i>
+        <i class="fa-solid fa-circle-check text-emerald-400 text-xl"></i>
         <span id="toastText">تمت العملية بنجاح</span>
     </div>
 
-    <!-- حاوية التطبيق الرئيسية -->
     <div class="app-wrapper">
         
         <!-- الترويسة العلوية -->
-        <div class="pt-8 pb-3 px-6 text-center z-10 relative">
-            <div class="absolute inset-0 bg-gradient-to-b from-slate-900/80 to-transparent -z-10"></div>
-            <h1 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-200 tracking-wide">
+        <div class="pt-10 pb-4 px-6 text-center z-10 relative">
+            <div class="absolute inset-0 bg-gradient-to-b from-slate-900/90 to-transparent -z-10"></div>
+            <h1 class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-200 tracking-wider drop-shadow-lg">
                 طرزان VIP
             </h1>
-            <p class="text-[0.65rem] text-emerald-500/70 mt-1 font-bold tracking-widest uppercase">System Manager</p>
+            <p class="text-[0.70rem] text-emerald-500/80 mt-1 font-bold tracking-[0.3em] uppercase">Master Control Panel</p>
         </div>
 
-        <!-- منطقة المحتوى القابلة للتمرير -->
         <div class="content-area">
 
             <!-- ==================== PAGE 1: HOME ==================== -->
             <section id="page-home" class="page-section active">
-                <div class="glass-card p-6 text-center mb-6 relative overflow-hidden">
-                    <div class="absolute -top-10 -right-10 w-32 h-32 bg-emerald-500 rounded-full blur-[50px] opacity-20"></div>
-                    <img src="https://b.top4top.io/p_3489wk62d0.jpg" alt="Tarzan" class="w-24 h-24 rounded-full mx-auto mb-4 border-2 border-emerald-500/50 object-cover shadow-[0_0_20px_rgba(16,185,129,0.2)]">
-                    <h2 class="text-xl font-bold mb-1">لوحة التحكم المركزية</h2>
-                    <p class="text-xs text-gray-400">إدارة البوت والذكاء الاصطناعي الخاص بك.</p>
+                <div class="glass-card p-6 text-center mb-6">
+                    <div class="absolute -top-10 -right-10 w-32 h-32 bg-emerald-500 rounded-full blur-[60px] opacity-20"></div>
+                    <div class="relative inline-block mb-4">
+                        <img src="https://b.top4top.io/p_3489wk62d0.jpg" alt="Tarzan" class="w-28 h-28 rounded-full border-4 border-slate-800 object-cover shadow-[0_0_25px_rgba(16,185,129,0.3)] z-10 relative">
+                        <div class="absolute bottom-0 right-0 w-8 h-8 bg-emerald-500 rounded-full border-4 border-slate-900 flex items-center justify-center text-white text-xs z-20">
+                            <i class="fa-solid fa-check"></i>
+                        </div>
+                    </div>
+                    <h2 class="text-2xl font-black mb-1">الذكاء الاصطناعي</h2>
+                    <p class="text-sm text-gray-400 font-semibold">جاهز لتنفيذ الأوامر والحماية</p>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4 mb-4">
-                    <div class="glass-card p-4 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition" onclick="switchPage('page-connect')">
-                        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 text-emerald-400 flex items-center justify-center text-xl mb-2">
-                            <i class="fa-solid fa-plus"></i>
+                    <div class="glass-card p-5 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition" onclick="switchPage('page-connect')">
+                        <div class="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-2xl mb-3 border border-emerald-500/20">
+                            <i class="fa-solid fa-plug-circle-plus"></i>
                         </div>
-                        <h3 class="font-bold text-sm">ربط رقم جديد</h3>
+                        <h3 class="font-bold text-sm">ربط حساب</h3>
                     </div>
                     
-                    <div class="glass-card p-4 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition" onclick="switchPage('page-settings')">
-                        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/10 text-purple-400 flex items-center justify-center text-xl mb-2">
+                    <div class="glass-card p-5 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition" onclick="switchPage('page-settings')">
+                        <div class="w-14 h-14 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center text-2xl mb-3 border border-purple-500/20">
                             <i class="fa-solid fa-sliders"></i>
                         </div>
-                        <h3 class="font-bold text-sm">إعدادات النظام</h3>
+                        <h3 class="font-bold text-sm">التحكم بالجلسة</h3>
                     </div>
                 </div>
 
-                <div class="glass-card p-4 flex items-center gap-4">
-                    <div class="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400">
-                        <i class="fa-solid fa-shield-check text-lg"></i>
+                <div class="glass-card p-4 flex items-center gap-4 border-r-4 border-r-emerald-500">
+                    <div class="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                        <i class="fa-solid fa-shield-halved text-xl"></i>
                     </div>
                     <div>
-                        <h4 class="font-bold text-sm">الحماية فعالة</h4>
-                        <p class="text-[0.65rem] text-gray-400 mt-1">البوت محمي ضد الحظر وتسريب البيانات.</p>
+                        <h4 class="font-bold text-sm">Anti-Delete V2</h4>
+                        <p class="text-xs text-gray-400 mt-1">نظام منع الحذف الفوري مفعل تلقائياً</p>
                     </div>
                 </div>
             </section>
 
             <!-- ==================== PAGE 2: CONNECT ==================== -->
             <section id="page-connect" class="page-section">
-                <div class="glass-card p-5 mb-5">
-                    <h2 class="text-lg font-bold mb-4 flex items-center gap-2 text-emerald-400">
+                <div class="glass-card p-6 mb-5">
+                    <h2 class="text-xl font-black mb-5 flex items-center gap-2 text-emerald-400 border-b border-white/10 pb-3">
                         <i class="fa-solid fa-link"></i> ربط الجلسة
                     </h2>
                     
-                    <div class="space-y-4">
+                    <div class="space-y-5">
                         <div>
                             <label class="block text-xs font-bold text-gray-400 mb-2 pl-2">اسم الجلسة (إنجليزي فقط)</label>
-                            <input type="text" id="sessionId" placeholder="مثال: my_bot1" class="input-vip">
+                            <div class="input-group">
+                                <input type="text" id="sessionId" placeholder="مثال: my_bot1" class="input-vip">
+                                <i class="fa-solid fa-id-badge"></i>
+                            </div>
                         </div>
 
                         <div>
-                            <label class="block text-xs font-bold text-gray-400 mb-2 pl-2">رقم الواتساب (بدون أصفار أو +)</label>
-                            <input type="number" id="phoneNumber" placeholder="مثال: 966500000000" class="input-vip text-left" dir="ltr">
+                            <label class="block text-xs font-bold text-gray-400 mb-2 pl-2">رقم الواتساب (للاقتران)</label>
+                            <div class="input-group">
+                                <input type="number" id="phoneNumber" placeholder="مثال: 966500000000" class="input-vip text-left" dir="ltr">
+                                <i class="fa-solid fa-phone"></i>
+                            </div>
                         </div>
 
-                        <div class="flex gap-3 pt-2">
-                            <button onclick="requestPairCode()" class="btn-action flex-1 flex items-center justify-center gap-2">
-                                <i class="fa-solid fa-key"></i> كود
+                        <div class="flex gap-3 pt-3">
+                            <button onclick="requestPairCode()" class="btn-action flex-1">
+                                <i class="fa-solid fa-key text-lg"></i> كود اقتران
                             </button>
-                            <button onclick="createSessionQR()" class="btn-action btn-qr flex-1 flex items-center justify-center gap-2">
-                                <i class="fa-solid fa-qrcode"></i> باركود
+                            <button onclick="createSessionQR()" class="btn-action btn-qr flex-1">
+                                <i class="fa-solid fa-qrcode text-lg"></i> باركود
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- شاشة العرض (Loading/Code/QR) -->
-                <div id="displayArea" class="glass-card p-6 text-center hidden min-h-[180px] flex-col justify-center">
-                    
-                    <!-- Loading -->
+                <div id="displayArea" class="glass-card p-8 text-center hidden min-h-[200px] flex-col justify-center border-emerald-500/30">
                     <div id="loading" class="hidden flex-col items-center">
-                        <div class="spinner mb-4"></div>
-                        <p class="text-sm font-bold text-emerald-400">جاري الإرسال لـ WhatsApp...</p>
+                        <div class="spinner mb-5"></div>
+                        <p class="text-sm font-bold text-emerald-400 animate-pulse">جاري الاتصال بخوادم WhatsApp...</p>
                     </div>
 
-                    <!-- Code -->
                     <div id="codeResult" class="hidden">
-                        <p class="text-[0.65rem] text-gray-400 uppercase tracking-widest mb-2">كود الاقتران الخاص بك</p>
-                        <div class="bg-black/40 border border-emerald-500/20 rounded-xl p-4 mb-3">
-                            <h1 id="theCode" class="text-3xl font-black text-emerald-400 tracking-[0.3em] select-all font-mono" dir="ltr">XXXX</h1>
+                        <p class="text-[0.7rem] text-emerald-500 font-bold uppercase tracking-widest mb-3">كود الاقتران الخاص بك</p>
+                        <div class="bg-black/60 border border-emerald-500/40 rounded-2xl p-5 mb-4 shadow-[inset_0_0_20px_rgba(16,185,129,0.1)]">
+                            <h1 id="theCode" class="text-4xl font-black text-white tracking-[0.4em] select-all font-mono drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]" dir="ltr">XXXX</h1>
                         </div>
-                        <p class="text-xs text-gray-400">واتساب > الأجهزة المرتبطة > ربط برقم الهاتف</p>
+                        <p class="text-xs text-gray-400 font-semibold bg-slate-800/50 p-3 rounded-lg border border-white/5">
+                            سيصلك إشعار من واتساب الآن، أدخل الكود أعلاه.
+                        </p>
                     </div>
 
-                    <!-- QR -->
                     <div id="qrResult" class="hidden flex-col items-center">
-                        <div class="bg-white p-2 rounded-xl mb-2">
-                            <img id="theQr" src="" alt="QR" class="w-36 h-36 rounded-lg">
+                        <div class="bg-white p-3 rounded-2xl mb-3 shadow-lg">
+                            <img id="theQr" src="" alt="QR" class="w-40 h-40 rounded-xl">
                         </div>
-                        <p class="text-xs text-gray-400">امسح الرمز بواسطة واتساب</p>
+                        <p class="text-xs text-gray-400 font-bold">امسح الرمز بواسطة واتساب</p>
                     </div>
-
                 </div>
             </section>
 
             <!-- ==================== PAGE 3: SETTINGS ==================== -->
             <section id="page-settings" class="page-section">
-                <div class="glass-card p-5 mb-5">
+                <div class="glass-card p-5 mb-5 border-purple-500/30">
                     <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-lg font-bold flex items-center gap-2 text-purple-400">
+                        <h2 class="text-xl font-black flex items-center gap-2 text-purple-400">
                             <i class="fa-solid fa-gear"></i> إعدادات البوت
                         </h2>
-                        <button onclick="fetchSessions()" class="w-8 h-8 rounded-full bg-slate-800 text-gray-400 hover:text-white flex items-center justify-center active:scale-90 transition">
-                            <i class="fa-solid fa-rotate-right text-sm"></i>
+                        <button onclick="fetchSessions()" class="w-10 h-10 rounded-full bg-slate-800 text-gray-400 hover:text-white flex items-center justify-center active:scale-90 transition shadow-inner">
+                            <i class="fa-solid fa-rotate-right"></i>
                         </button>
                     </div>
                     
-                    <select id="activeSessions" onchange="loadSettings()" class="input-vip text-center font-bold appearance-none bg-slate-800">
+                    <select id="activeSessions" onchange="showAuthPanel()" class="input-vip text-center font-bold appearance-none bg-slate-800 border-purple-500/30 text-lg mb-3">
                         <option value="">-- اختر جلسة لضبطها --</option>
                     </select>
                 </div>
 
+                <!-- شاشة إدخال كلمة المرور (القفل) -->
+                <div id="authPanel" class="hidden glass-card p-6 text-center border-red-500/20">
+                    <div class="w-16 h-16 bg-slate-800 rounded-full mx-auto flex items-center justify-center text-2xl text-amber-400 mb-4 shadow-inner border border-white/5">
+                        <i class="fa-solid fa-lock"></i>
+                    </div>
+                    <h3 class="font-bold text-lg mb-2">الجلسة محمية</h3>
+                    <p class="text-xs text-gray-400 mb-5">يرجى إدخال كلمة المرور التي تم إرسالها لرقمك في واتساب عند الربط.</p>
+                    
+                    <div class="input-group mb-4">
+                        <input type="password" id="sessionPassword" placeholder="كلمة المرور (VIP-...)" class="input-vip text-center font-mono tracking-wider" dir="ltr">
+                        <i class="fa-solid fa-key"></i>
+                    </div>
+                    
+                    <button onclick="unlockSettings()" class="btn-action w-full">
+                        <i class="fa-solid fa-unlock"></i> فتح لوحة التحكم
+                    </button>
+                </div>
+
+                <!-- لوحة الإعدادات (تظهر بعد فك القفل) -->
                 <div id="settingsPanel" class="hidden space-y-4">
-                    <div class="glass-card p-4 flex justify-between items-center">
-                        <div>
-                            <h3 class="font-bold text-sm">التفاعل التلقائي</h3>
-                            <p class="text-[0.65rem] text-gray-400 mt-1">وضع إيموجي على أي رسالة</p>
+                    
+                    <!-- أزرار التحكم الرئيسية -->
+                    <div class="glass-card p-5 bg-gradient-to-br from-slate-800/80 to-slate-900 border-l-4 border-l-emerald-500">
+                        <div class="flex justify-between items-center mb-4 border-b border-white/5 pb-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400"><i class="fa-solid fa-robot"></i></div>
+                                <div>
+                                    <h3 class="font-bold text-sm text-white">تشغيل البوت بالكامل</h3>
+                                    <p class="text-[0.65rem] text-gray-400 mt-1">الزر الرئيسي للنظام</p>
+                                </div>
+                            </div>
+                            <input type="checkbox" id="botToggle" class="toggle-switch">
                         </div>
-                        <input type="checkbox" id="autoReactToggle" class="toggle-switch">
+
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400"><i class="fa-solid fa-terminal"></i></div>
+                                <div>
+                                    <h3 class="font-bold text-sm text-white">تشغيل الأوامر</h3>
+                                    <p class="text-[0.65rem] text-gray-400 mt-1">السماح بتنفيذ الأوامر</p>
+                                </div>
+                            </div>
+                            <input type="checkbox" id="cmdToggle" class="toggle-switch">
+                        </div>
                     </div>
 
-                    <div class="glass-card p-4">
-                        <h3 class="font-bold text-sm mb-3">الإيموجي المفضل</h3>
-                        <div class="flex gap-3">
-                            <input type="text" id="reactEmoji" value="❤️" class="input-vip text-center text-2xl p-2 h-14 w-full" maxlength="2">
-                            <div class="flex gap-2">
-                                <button onclick="document.getElementById('reactEmoji').value='❤️'" class="w-12 h-14 bg-slate-800 rounded-xl text-xl active:scale-90 transition">❤️</button>
-                                <button onclick="document.getElementById('reactEmoji').value='🔥'" class="w-12 h-14 bg-slate-800 rounded-xl text-xl active:scale-90 transition">🔥</button>
-                                <button onclick="document.getElementById('reactEmoji').value='🤖'" class="w-12 h-14 bg-slate-800 rounded-xl text-xl active:scale-90 transition">🤖</button>
+                    <!-- إعدادات التفاعل -->
+                    <div class="glass-card p-5">
+                        <div class="flex justify-between items-center mb-4 border-b border-white/5 pb-4">
+                            <div>
+                                <h3 class="font-bold text-sm text-white">التفاعل التلقائي</h3>
+                                <p class="text-[0.65rem] text-gray-400 mt-1">وضع إيموجي على كل رسالة</p>
+                            </div>
+                            <input type="checkbox" id="autoReactToggle" class="toggle-switch">
+                        </div>
+
+                        <div>
+                            <h3 class="font-bold text-sm mb-3">الإيموجي المفضل</h3>
+                            <div class="flex gap-3">
+                                <input type="text" id="reactEmoji" value="❤️" class="input-vip text-center text-3xl p-2 h-14 w-full bg-black/40" maxlength="2">
+                                <div class="flex gap-2">
+                                    <button onclick="document.getElementById('reactEmoji').value='❤️'" class="w-12 h-14 bg-slate-800 rounded-xl text-xl active:scale-90 transition border border-white/5 shadow-inner">❤️</button>
+                                    <button onclick="document.getElementById('reactEmoji').value='🔥'" class="w-12 h-14 bg-slate-800 rounded-xl text-xl active:scale-90 transition border border-white/5 shadow-inner">🔥</button>
+                                    <button onclick="document.getElementById('reactEmoji').value='🤖'" class="w-12 h-14 bg-slate-800 rounded-xl text-xl active:scale-90 transition border border-white/5 shadow-inner">🤖</button>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <button onclick="saveSettings()" class="btn-action btn-purple w-full flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-floppy-disk"></i> حفظ الإعدادات
+                    <button onclick="saveSettings()" class="btn-action btn-purple w-full py-4 text-lg">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> حفظ الإعدادات
                     </button>
+
+                    <!-- منطقة الخطر (حذف الجلسة) -->
+                    <div class="glass-card p-5 border border-red-500/30 mt-8 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-16 h-16 bg-red-500/10 rounded-bl-full flex justify-center items-center text-red-500 pl-4 pb-4"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                        <h3 class="font-black text-red-400 mb-2">منطقة الخطر</h3>
+                        <p class="text-xs text-gray-400 mb-4">هذا الإجراء سيقوم بحذف الجلسة وتسجيل الخروج من واتساب نهائياً.</p>
+                        
+                        <div class="input-group mb-3">
+                            <input type="password" id="masterPassword" placeholder="كلمة مرور السيرفر الرئيسي" class="input-vip border-red-500/30 text-center" dir="ltr">
+                            <i class="fa-solid fa-shield-cat"></i>
+                        </div>
+                        <button onclick="deleteSession()" class="btn-action btn-danger w-full text-sm">
+                            <i class="fa-solid fa-trash-can"></i> حذف الجلسة نهائياً
+                        </button>
+                    </div>
+
                 </div>
                 
-                <div id="noSessionMsg" class="text-center text-gray-500 text-xs mt-10">
-                    <i class="fa-solid fa-hand-pointer text-2xl mb-2 opacity-50 block"></i>
+                <div id="noSessionMsg" class="text-center text-gray-500 text-sm mt-12 font-bold">
+                    <i class="fa-solid fa-hand-pointer text-3xl mb-3 opacity-30 block"></i>
                     يرجى اختيار الجلسة أولاً
                 </div>
             </section>
 
-        </div> <!-- End of content area -->
+        </div> 
 
-        <!-- شريط التنقل السفلي الثابت والأصيل -->
+        <!-- شريط التنقل السفلي -->
         <nav class="bottom-nav">
             <div class="nav-item active" onclick="switchPage('page-home')" id="nav-home">
                 <i class="fa-solid fa-house"></i>
@@ -459,8 +535,10 @@
 
     </div>
 
-    <!-- المنطق البرمجي (نفسه لم يتغير، فقط ربطناه بالتصميم الجديد) -->
+    <!-- المنطق البرمجي السلس والمتقدم -->
     <script>
+        let verifiedPassword = '';
+
         function switchPage(pageId) {
             document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
             document.getElementById(pageId).classList.add('active');
@@ -477,9 +555,9 @@
             document.getElementById('toastText').textContent = message;
             
             toast.className = `toast-msg show ${type === 'error' ? 'error' : ''}`;
-            icon.className = type === 'error' ? 'fa-solid fa-triangle-exclamation' : 'fa-solid fa-circle-check text-emerald-400';
+            icon.className = type === 'error' ? 'fa-solid fa-circle-exclamation text-red-400 text-xl' : 'fa-solid fa-circle-check text-emerald-400 text-xl';
 
-            setTimeout(() => toast.classList.remove('show'), 3000);
+            setTimeout(() => toast.classList.remove('show'), 3500);
         }
 
         function showLoader() {
@@ -507,10 +585,10 @@
                 document.getElementById('loading').classList.add('hidden');
                 
                 if (data.pairingCode) {
-                    document.getElementById('theCode').textContent = data.pairingCode.match(/.{1,4}/g).join('-');
+                    document.getElementById('theCode').textContent = data.pairingCode;
                     document.getElementById('codeResult').classList.remove('hidden');
                     document.getElementById('codeResult').style.display = 'block';
-                    showToast('تم استخراج الكود!');
+                    showToast('تم استخراج الكود! شيك واتساب');
                 } else throw new Error(data.error);
             } catch (err) {
                 document.getElementById('displayArea').classList.add('hidden');
@@ -553,43 +631,113 @@
                 select.innerHTML = '<option value="">-- اختر جلسة لضبطها --</option>';
                 data.sessions.forEach(s => select.innerHTML += `<option value="${s}">${s}</option>`);
                 if(data.sessions.includes(current)) select.value = current;
+                else showAuthPanel(); // Reset if session deleted
             } catch (e) {}
         }
 
-        async function loadSettings() {
+        function showAuthPanel() {
+            verifiedPassword = ''; // تفريغ الباسورد عند تغيير الجلسة
             const sessionId = document.getElementById('activeSessions').value;
+            
+            document.getElementById('settingsPanel').classList.add('hidden');
+            document.getElementById('sessionPassword').value = '';
+
             if (!sessionId) {
-                document.getElementById('settingsPanel').classList.add('hidden');
+                document.getElementById('authPanel').classList.add('hidden');
                 document.getElementById('noSessionMsg').classList.remove('hidden');
-                return;
+            } else {
+                document.getElementById('noSessionMsg').classList.add('hidden');
+                document.getElementById('authPanel').classList.remove('hidden');
             }
-            document.getElementById('noSessionMsg').classList.add('hidden');
-            document.getElementById('settingsPanel').classList.remove('hidden');
+        }
+
+        async function unlockSettings() {
+            const sessionId = document.getElementById('activeSessions').value;
+            const password = document.getElementById('sessionPassword').value.trim();
+
+            if (!password) return showToast('يرجى إدخال كلمة المرور', 'error');
 
             try {
-                const res = await fetch(`/api/settings/${sessionId}`);
+                const res = await fetch('/api/settings/get', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId, password })
+                });
                 const data = await res.json();
-                document.getElementById('autoReactToggle').checked = data.autoReact || false;
+                
+                if (data.error) throw new Error(data.error);
+
+                // حفظ الباسورد الصالح لاستخدامه عند الحفظ
+                verifiedPassword = password;
+
+                // تحديث الواجهة
+                document.getElementById('authPanel').classList.add('hidden');
+                document.getElementById('settingsPanel').classList.remove('hidden');
+                
+                // تعبئة البيانات
+                document.getElementById('botToggle').checked = data.botEnabled;
+                document.getElementById('cmdToggle').checked = data.commandsEnabled;
+                document.getElementById('autoReactToggle').checked = data.autoReact;
                 document.getElementById('reactEmoji').value = data.reactEmoji || '❤️';
-            } catch (e) {}
+
+                showToast('🔓 تم فتح لوحة التحكم بنجاح');
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
         }
 
         async function saveSettings() {
             const sessionId = document.getElementById('activeSessions').value;
+            const botEnabled = document.getElementById('botToggle').checked;
+            const commandsEnabled = document.getElementById('cmdToggle').checked;
             const autoReact = document.getElementById('autoReactToggle').checked;
             const reactEmoji = document.getElementById('reactEmoji').value.trim() || '❤️';
 
             try {
-                const res = await fetch(`/api/settings/${sessionId}`, {
+                const res = await fetch('/api/settings/save', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ autoReact, reactEmoji })
+                    body: JSON.stringify({ 
+                        sessionId, 
+                        password: verifiedPassword,
+                        botEnabled,
+                        commandsEnabled,
+                        autoReact, 
+                        reactEmoji 
+                    })
                 });
                 const data = await res.json();
-                if (data.success) showToast('تم الحفظ بنجاح');
-                else throw new Error();
+                if (data.success) showToast('✅ تم حفظ التعديلات بنجاح');
+                else throw new Error(data.error);
             } catch (err) {
-                showToast('فشل الحفظ', 'error');
+                showToast(err.message || 'فشل الحفظ', 'error');
+            }
+        }
+
+        async function deleteSession() {
+            const sessionId = document.getElementById('activeSessions').value;
+            const password = document.getElementById('masterPassword').value.trim();
+
+            if(!password) return showToast('أدخل كلمة المرور الرئيسية أولاً', 'error');
+
+            if(confirm('⚠️ هل أنت متأكد من حذف الجلسة نهائياً؟ لا يمكن التراجع عن هذا الإجراء.')) {
+                try {
+                    const res = await fetch('/delete-session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sessionId, password })
+                    });
+                    const data = await res.json();
+                    
+                    if(data.message) {
+                        showToast(data.message);
+                        document.getElementById('masterPassword').value = '';
+                        fetchSessions();
+                        showAuthPanel();
+                    } else throw new Error(data.error);
+                } catch(err) {
+                    showToast(err.message || 'خطأ في الحذف', 'error');
+                }
             }
         }
 
