@@ -1,66 +1,64 @@
 const { downloadMediaMessage, jidNormalizedUser } = require('@whiskeysockets/baileys');
 
 module.exports = {
-    name: '🌚', // الأمر الأساسي هو الإيموجي
-    aliases: ['vv', 'فك'], // يمكن تشغيله أيضاً باستخدام .vv أو .فك
+    name: '🌚', 
+    aliases: ['vv', 'فك', 'استخراج'], // يمكن تشغيله بأي من هذه الكلمات
     execute: async ({ sock, msg, reply, from, isFromMe }) => {
         
-        // 1. حماية قصوى: يجب أن تكون أنت (صاحب الرقم) من أرسل الأمر
-        // إذا قام عضو آخر بكتابة الأمر، سيتجاهله البوت تماماً
+        // 1. حماية قصوى: الأمر لن يعمل إلا إذا كنت أنت (صاحب البوت) من أرسله
         if (!isFromMe) return;
 
-        // 2. التحقق من وجود رسالة مقتبسة (رد على رسالة)
+        // 2. التحقق من أنك قمت بالرد على رسالة
         const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
-        const quotedMsg = contextInfo?.quotedMessage;
+        if (!contextInfo || !contextInfo.quotedMessage) return;
 
-        // إذا لم يكن رداً على شيء، نخرج بصمت تام
-        if (!quotedMsg) return; 
+        const quotedMsg = contextInfo.quotedMessage;
 
-        // 3. التحقق من أن الرسالة هي "عرض لمرة واحدة" (View Once)
-        const viewOnceMsg = quotedMsg.viewOnceMessage || quotedMsg.viewOnceMessageV2 || quotedMsg.viewOnceMessageV2Extension;
+        // 3. التحقق من أن الرسالة هي "عرض لمرة واحدة" بجميع إصدارات واتساب الجديدة
+        const viewOnce = quotedMsg.viewOnceMessage || quotedMsg.viewOnceMessageV2 || quotedMsg.viewOnceMessageV2Extension;
         
-        // إذا كانت رسالة عادية، نخرج بصمت
-        if (!viewOnceMsg) return; 
+        if (!viewOnce) {
+            return reply('⚠️ هذه الرسالة عادية وليست "عرض لمرة واحدة".');
+        }
 
         try {
-            // 4. وضع تفاعل "قيد التحميل" بصمت في المجموعة
-            await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } });
-
-            // 5. فك تشفير الرسالة
-            const actualMessage = viewOnceMsg.message;
+            // 5. استخراج الرسالة الحقيقية من داخل غلاف ViewOnce
+            const actualMessage = viewOnce.message;
             const mediaType = Object.keys(actualMessage)[0];
-            
-            const fakeMsg = { 
-                key: { 
-                    remoteJid: from, 
+
+            // 6. [الخطوة الأهم] بناء كائن الرسالة بشكل صحيح لتجاوز حظر التحميل
+            const fakeMsg = {
+                key: {
+                    remoteJid: from,
                     id: contextInfo.stanzaId, 
                     participant: contextInfo.participant 
-                }, 
-                message: actualMessage 
+                },
+                message: actualMessage
             };
-            
-            const buffer = await downloadMediaMessage(fakeMsg, 'buffer', {}, { logger: console });
-            
-            // 6. تحديد رقمك الخاص (الرسائل المحفوظة)
-            const selfId = jidNormalizedUser(sock.user.id);
-            const captionTxt = '🕵️‍♂️ *تم سحب الميديا بسرية تامة*\n*— TARZAN VIP 👑*';
 
-            // 7. إرسال الوسائط إلى رقمك الخاص فقط
+            // 7. سحب الميديا من سيرفرات واتساب
+            const mediaBuffer = await downloadMediaMessage(
+                fakeMsg,
+                'buffer',
+                {},
+                { logger: console }
+            );
+
+            // 8. تحديد وجهة الإرسال (رقمك أنت فقط لضمان السرية)
+            const selfId = jidNormalizedUser(sock.user.id);
+            const captionText = '🕵️‍♂️ *تم سحب الميديا يدوياً بنجاح*\n*— TARZAN VIP 👑*';
+
+            // 9. إرسال الوسائط إلى رسائلك المحفوظة
             if (mediaType === 'imageMessage') {
-                await sock.sendMessage(selfId, { image: buffer, caption: captionTxt });
+                await sock.sendMessage(selfId, { image: mediaBuffer, caption: captionText });
             } else if (mediaType === 'videoMessage') {
-                await sock.sendMessage(selfId, { video: buffer, caption: captionTxt });
+                await sock.sendMessage(selfId, { video: mediaBuffer, caption: captionText });
             } else if (mediaType === 'audioMessage') {
-                await sock.sendMessage(selfId, { audio: buffer, mimetype: 'audio/mpeg', ptt: true });
+                await sock.sendMessage(selfId, { audio: mediaBuffer, mimetype: 'audio/mpeg', ptt: true });
             }
 
-            // 8. وضع علامة (صح) في المجموعة لإعلامك بنجاح السحب
-            await sock.sendMessage(from, { react: { text: '✅', key: msg.key } });
-
-        } catch (error) {
-            console.error('❌ خطأ في سحب الميديا:', error);
-            // في حال فشل السحب (مثلاً الصورة محذوفة من السيرفر)
-            await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
+        } catch (err) {
+            console.error('❌ خطأ في السحب اليدوي:', err);
         }
     }
 };
