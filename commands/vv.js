@@ -1,7 +1,6 @@
 /**
- * 👑 استخراج الميديا والوسائط المخفية (Anti-View Once)
- * 💻 تطوير وتصميم: طرزان الواقدي
- * ⚙️ الوظيفة: يعمل بمجرد ردك على الميديا بأي كلمة، بدون الحاجة لأمر محدد
+ * 👑 أمر استخراج الميديا الفوري (VIP)
+ * ⚙️ الوظيفة: الرد على أي ميديا بـ نقطة (.) متبوعة بأي شيء لسحبها فوراً
  */
 const { downloadMediaMessage, jidNormalizedUser } = require('@whiskeysockets/baileys');
 
@@ -13,21 +12,26 @@ const allowedMediaTypes = [
   'stickerMessage',
 ];
 
-module.exports = async ({ sock, msg }) => {
-  // 1. تحديد رقم الجلسة (المالك / طرزان)
+module.exports = async ({ sock, msg, text, from }) => {
+  // 1. التفعيل الذكي: التحقق من أن الرسالة تبدأ بنقطة (.) فقط
+  // سواء كانت (.) أو (.سحب) أو (.😂) سيعمل الكود
+  if (!text || !text.startsWith('.')) return;
+
+  // 2. حماية قصوى: يجب أن تكون أنت (صاحب البوت) من أرسل الأمر
   const sessionOwnerJid = jidNormalizedUser(sock.user.id);
   const sender = msg.key.participant || msg.key.remoteJid;
+  const isFromMe = msg.key.fromMe || sender === sessionOwnerJid;
+  
+  if (!isFromMe) return; 
 
-  // 2. حماية فخمة: يعمل فقط إذا كان الرد صادر منك شخصياً، لتجنب الإزعاج من الأعضاء
-  if (sender !== sessionOwnerJid && !msg.key.fromMe) return;
-
-  // 3. جلب الرسالة المقتبسة (التي تم الرد عليها)
+  // 3. التحقق من وجود رسالة مقتبسة (رد على رسالة)
   const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
-  if (!contextInfo || !contextInfo.quotedMessage) return; // نخرج بصمت إذا لم يكن هناك رد
+  let quoted = contextInfo?.quotedMessage;
 
-  let quoted = contextInfo.quotedMessage;
+  // إذا لم يكن رداً على شيء، نخرج بصمت (حتى لا يتعارض مع أوامرك الأخرى)
+  if (!quoted) return;
 
-  // 4. دعم رسائل "العرض لمرة واحدة" (View Once) واختراقها
+  // 4. فك تشفير رسائل العرض لمرة واحدة (View Once)
   const isViewOnce = quoted.viewOnceMessage || quoted.viewOnceMessageV2 || quoted.viewOnceMessageV2Extension;
   if (isViewOnce) {
       quoted = isViewOnce.message;
@@ -36,58 +40,67 @@ module.exports = async ({ sock, msg }) => {
   // 5. التحقق من نوع الوسائط المقتبسة
   const mediaType = Object.keys(quoted).find(type => allowedMediaTypes.includes(type));
   
-  // إذا كان الرد على رسالة نصية، نخرج بصمت (بدون رسائل خطأ مزعجة)
+  // إذا لم تكن ميديا (مثلاً رد على نص عادي)، نخرج بصمت وبدون أخطاء
   if (!mediaType) return;
 
   try {
-    // إعطاء تفاعل قيد التنفيذ للرسالة لإشعارك ببدء العمل
-    await sock.sendMessage(msg.key.remoteJid, { react: { text: '⏳', key: msg.key } });
+    // تفاعل لإثبات أن البوت استلم الأمر وبدأ السحب
+    await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } });
 
-    // 6. تحميل الوسائط
+    // 6. بناء مفتاح الرسالة الوهمي بشكل صحيح لمكتبة Baileys
+    const fakeMessage = {
+        key: {
+            remoteJid: from,
+            id: contextInfo.stanzaId,
+            participant: contextInfo.participant
+        },
+        message: quoted
+    };
+
+    // 7. سحب وتحميل الميديا من سيرفرات واتساب
     const mediaBuffer = await downloadMediaMessage(
-      { key: contextInfo, message: contextInfo.quotedMessage },
+      fakeMessage,
       'buffer',
       {},
       { logger: console }
     );
 
-    // 7. تحضير الرسالة مع توقيع طرزان الواقدي 👑
-    const signature = `\n\n*— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑩𝑶𝑻 ⚔️*`;
+    // 8. تحضير الرسالة مع توقيع فخم
+    const captionText = '✅ *تم سحب الوسائط بنجاح*\n\n*— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑩𝑶𝑻 👑*';
     let sendMsg = {};
 
     switch (mediaType) {
       case 'imageMessage':
-        sendMsg = { image: mediaBuffer, caption: `*📸 تم سحب الصورة بنجاح*${signature}` };
+        sendMsg = { image: mediaBuffer, caption: captionText };
         break;
       case 'videoMessage':
-        sendMsg = { video: mediaBuffer, caption: `*🎥 تم سحب الفيديو بنجاح*${signature}` };
+        sendMsg = { video: mediaBuffer, caption: captionText };
         break;
       case 'audioMessage':
-        // تحويل الصوت إلى بصمة صوتية (Voice Note) لزيادة الفخامة
-        sendMsg = { audio: mediaBuffer, mimetype: 'audio/mpeg', ptt: true }; 
+        sendMsg = { audio: mediaBuffer, mimetype: 'audio/mpeg', ptt: true };
         break;
       case 'documentMessage':
         sendMsg = {
           document: mediaBuffer,
           mimetype: quoted.documentMessage.mimetype,
-          fileName: quoted.documentMessage.fileName || 'Tarzan_Document',
-          caption: `*📂 تم سحب الملف*${signature}`
+          fileName: quoted.documentMessage.fileName || 'Tarzan_VIP_File',
+          caption: captionText
         };
         break;
       case 'stickerMessage':
-        sendMsg = { sticker: mediaBuffer }; // الملصقات لا تقبل نصاً وصفياً (Caption)
+        sendMsg = { sticker: mediaBuffer };
         break;
     }
 
-    // 8. إرسال الوسائط المستخرجة إلى رقمك فقط
+    // 9. إرسال الوسائط إلى رقم الجلسة فقط (في الخاص بك)
     await sock.sendMessage(sessionOwnerJid, sendMsg);
 
-    // تفاعل بالنجاح لتأكيد الإرسال
-    await sock.sendMessage(msg.key.remoteJid, { react: { text: '✅', key: msg.key } });
+    // تفاعل بالنجاح في المحادثة الأصلية
+    await sock.sendMessage(from, { react: { text: '✅', key: msg.key } });
 
   } catch (error) {
-    console.error('❌ خطأ في استعادة الوسائط:', error);
-    // إشعار بالخطأ في حال فشل التحميل
-    await sock.sendMessage(msg.key.remoteJid, { react: { text: '❌', key: msg.key } });
+    console.error('❌ خطأ في استعادة الوسائط:', error.message);
+    // تفاعل بالخطأ في حال فشل السحب
+    await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
   }
 };
