@@ -3,6 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const qrCode = require('qrcode');
 const moment = require('moment-timezone');
+const axios = require('axios');
+const { Sticker, StickerTypes } = require('wa-sticker-formatter');
 const {
     default: makeWASocket,
     useMultiFileAuthState,
@@ -31,13 +33,17 @@ else { fs.writeFileSync(settingsPath, JSON.stringify(botSettings)); }
 function saveSettings() { fs.writeFileSync(settingsPath, JSON.stringify(botSettings, null, 2)); }
 function generateSessionPassword() { return 'VIP-' + Math.random().toString(36).substring(2, 8).toUpperCase(); }
 
-setInterval(() => { msgStore.clear(); console.log('🧹 تم تنظيف الذاكرة المؤقتة'); }, 2 * 60 * 60 * 1000);
+// ✅ إنشاء مجلد الخزنة السرية للميديا (ViewOnce Vault)
+const vaultPath = path.join(__dirname, 'ViewOnce_Vault');
+if (!fs.existsSync(vaultPath)) fs.mkdirSync(vaultPath);
+
+setInterval(() => { msgStore.clear(); console.log('🧹 تم تنظيف الذاكرة المؤقتة للرسائل'); }, 2 * 60 * 60 * 1000);
 
 app.use(express.static('public'));
 app.use(express.json());
 
 // ==========================================
-// 🚀 نظام تحميل الأوامر الدقيق (Command Handler)
+// 🚀 نظام تحميل الأوامر الدقيق
 // ==========================================
 const commandsMap = new Map();
 const commandsPath = path.join(__dirname, 'commands');
@@ -48,27 +54,23 @@ function loadCommands() {
     const files = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
     for (const file of files) {
         try {
-            // مسح الكاش لضمان تحديث الأمر إذا قمت بتعديله
             delete require.cache[require.resolve(`./commands/${file}`)];
             const command = require(`./commands/${file}`);
-            
             if (command.name && command.execute) {
                 commandsMap.set(command.name.toLowerCase(), command);
-                // تحميل الاختصارات (Aliases)
                 if (command.aliases && Array.isArray(command.aliases)) {
                     command.aliases.forEach(alias => commandsMap.set(alias.toLowerCase(), command));
                 }
-                console.log(`✅ تم تحميل الأمر: ${command.name}`);
             }
         } catch (err) {
-            console.error(`❌ خطأ في تحميل ملف الأمر ${file}:`, err.message);
+            console.error(`❌ خطأ في تحميل الأمر ${file}:`, err.message);
         }
     }
 }
-loadCommands(); // تشغيل التحميل عند بدء السيرفر
+loadCommands();
 
 // ==========================================
-// ⚙️ تشغيل الجلسة
+// ⚙️ تشغيل الجلسة والقلب النابض
 // ==========================================
 async function startSession(sessionId, res = null, pairingNumber = null) {
     const sessionPath = path.join(__dirname, 'sessions', sessionId);
@@ -87,7 +89,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, console) },
         printQRInTerminal: false,
         markOnlineOnConnect: true,
-        browser: Browsers.macOS('Desktop'), // هام لنجاح كود الاقتران
+        browser: Browsers.macOS('Desktop'),
         syncFullHistory: false
     });
 
@@ -131,7 +133,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         }
     });
 
-    // 🛡️ مضاد الحذف (Anti-Delete)
+    // 🛡️ مضاد الحذف الجبار (Anti-Delete)
     sock.ev.on('messages.update', async updates => {
         for (const { key, update } of updates) {
             if (update?.message === null && key?.remoteJid && !key.fromMe) {
@@ -152,7 +154,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
     });
 
     // ==========================================
-    // 🔥 استقبال الرسائل وتنفيذ الأوامر المستقلة
+    // 🔥 استقبال الرسائل والأنظمة التلقائية
     // ==========================================
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
         if (type !== 'notify') return;
@@ -171,7 +173,44 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         const currentSettings = botSettings[sessionId] || {};
         if (!currentSettings.botEnabled) return;
 
-        if (currentSettings.autoReact && !isFromMe) {
+        // ==========================================
+        // 👁️‍🗨️ [الرادار]: صائد العرض لمرة واحدة التلقائي (Auto-Catcher)
+        // ==========================================
+        // يتحقق هل الرسالة القادمة هي عرض لمرة واحدة (حتى لو لم يطلب أحد فكها)
+        const viewOnceIncoming = msg.message.viewOnceMessage || msg.message.viewOnceMessageV2 || msg.message.viewOnceMessageV2Extension;
+        
+        if (viewOnceIncoming && !isFromMe) {
+            try {
+                console.log('👁️‍🗨️ [رادار طرزان]: تم رصد ميديا مخفية! جاري الحفظ...');
+                
+                // 1. سحب الميديا فوراً
+                const actualMessage = viewOnceIncoming.message;
+                const mediaType = Object.keys(actualMessage)[0];
+                const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: console });
+
+                // 2. حفظ الميديا في ملف محلي داخل السيرفر
+                const ext = mediaType === 'imageMessage' ? 'jpg' : (mediaType === 'videoMessage' ? 'mp4' : 'ogg');
+                const fileName = `VO_${sender.split('@')[0]}_${Date.now()}.${ext}`;
+                const filePath = path.join(vaultPath, fileName);
+                fs.writeFileSync(filePath, buffer);
+
+                // 3. إرسال نسخة سرية إلى المالك (رقمك) مع تقرير الرادار
+                const reportTxt = `🚨 *[رادار الميديا المخفية]* 🚨\n\n👤 *المرسل:* ${pushName}\n📱 *الرقم:* wa.me/${sender.split('@')[0]}\n📁 *حُفظت بالسيرفر باسم:* ${fileName}\n\n*— TARZAN VIP 👑*`;
+                
+                if (mediaType === 'imageMessage') {
+                    await sock.sendMessage(selfId, { image: buffer, caption: reportTxt });
+                } else if (mediaType === 'videoMessage') {
+                    await sock.sendMessage(selfId, { video: buffer, caption: reportTxt });
+                } else if (mediaType === 'audioMessage') {
+                    await sock.sendMessage(selfId, { audio: buffer, mimetype: 'audio/mpeg', ptt: true });
+                }
+            } catch (err) {
+                console.error('❌ خطأ في الرادار التلقائي:', err);
+            }
+        }
+
+        // التفاعل التلقائي
+        if (currentSettings.autoReact && !isFromMe && !viewOnceIncoming) {
             try { await sock.sendMessage(from, { react: { text: currentSettings.reactEmoji || '❤️', key: msg.key } }); } catch(e) {}
         }
 
@@ -183,31 +222,12 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
             return await sock.sendMessage(from, { text: text }, { quoted: msg });
         };
 
-        // 🛡️ مضاد العرض لمرة واحدة (Anti View Once)
-        if (isFromMe && body.startsWith('.') && msg.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
-            const quotedMsg = msg.message.extendedTextMessage.contextInfo.quotedMessage;
-            const viewOnceMsg = quotedMsg.viewOnceMessage || quotedMsg.viewOnceMessageV2 || quotedMsg.viewOnceMessageV2Extension;
-            if (viewOnceMsg) {
-                try {
-                    await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } });
-                    const mediaType = Object.keys(viewOnceMsg.message)[0];
-                    const fakeMsg = { key: { remoteJid: from, id: msg.message.extendedTextMessage.contextInfo.stanzaId }, message: viewOnceMsg.message };
-                    const buffer = await downloadMediaMessage(fakeMsg, 'buffer', {}, { logger: console });
-                    if (mediaType === 'imageMessage') await sock.sendMessage(selfId, { image: buffer, caption: '📸 تم سحب الصورة\n*— TARZAN VIP*' });
-                    else if (mediaType === 'videoMessage') await sock.sendMessage(selfId, { video: buffer, caption: '🎥 تم سحب الفيديو\n*— TARZAN VIP*' });
-                    await sock.sendMessage(from, { react: { text: '✅', key: msg.key } });
-                    return; 
-                } catch (e) { await sock.sendMessage(from, { react: { text: '❌', key: msg.key } }); }
-            }
-        }
-
         if (!currentSettings.commandsEnabled) return;
 
-        // 🎯 معالجة واستدعاء الأمر المطلوب بدقة
+        // 🎯 معالجة باقي الأوامر الخارجية
         const prefix = '.';
         const isCmd = body.startsWith(prefix);
         
-        // استخراج اسم الأمر (من الزر أو من النص)
         let commandName = '';
         let args = [];
         let textArgs = '';
@@ -222,23 +242,17 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 
         if (!commandName) return;
 
-        // البحث عن الأمر في مجلد الأوامر (Command Handler Logic)
         const commandData = commandsMap.get(commandName);
 
         if (commandData) {
             try {
-                // إظهار تفاعل قيد التنفيذ
                 await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } });
-                
-                // تمرير كل البيانات المطلوبة لملف الأمر المستقل
                 await commandData.execute({
                     sock, msg, body, args, text: textArgs, reply, from, isGroup, sender, pushName, isFromMe, prefix, commandName
                 });
-
             } catch (error) {
                 console.error(`❌ خطأ في تنفيذ الأمر ${commandName}:`, error);
                 await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
-                await reply('⚠️ حدث خطأ داخلي أثناء تنفيذ هذا الأمر.');
             }
         }
     });
