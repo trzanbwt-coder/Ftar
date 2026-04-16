@@ -4,14 +4,12 @@ const path = require('path');
 const qrCode = require('qrcode');
 const moment = require('moment-timezone');
 const axios = require('axios');
-const { Sticker, StickerTypes } = require('wa-sticker-formatter');
 const {
     default: makeWASocket,
     useMultiFileAuthState,
     DisconnectReason,
     fetchLatestBaileysVersion,
     makeCacheableSignalKeyStore,
-    Browsers,
     downloadMediaMessage,
     jidNormalizedUser,
     generateWAMessageFromContent,
@@ -89,13 +87,15 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, console) },
         printQRInTerminal: false,
         markOnlineOnConnect: true,
-        browser: Browsers.macOS('Desktop'),
+        // 🌟 [التحديث الجبار]: استخدام محرك Microsoft Edge على نظام Windows لمنع الحظر وضمان وصول كود الاقتران
+        browser: ['Windows', 'Edge', '10.0'],
         syncFullHistory: false
     });
 
     sessions[sessionId] = sock;
     sock.ev.on('creds.update', saveCreds);
 
+    // 🌟 طلب كود الاقتران الفوري
     if (pairingNumber && !sock.authState.creds.registered) {
         setTimeout(async () => {
             try {
@@ -103,9 +103,10 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
                 const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
                 if (res && !res.headersSent) res.json({ pairingCode: formattedCode });
             } catch (err) {
-                if (res && !res.headersSent) res.status(500).json({ error: 'تعذر طلب الكود.' });
+                console.log('❌ خطأ في كود الاقتران:', err);
+                if (res && !res.headersSent) res.status(500).json({ error: 'تعذر طلب الكود. تأكد من الرقم وحاول مجدداً.' });
             }
-        }, 2500); 
+        }, 3000); // 3 ثواني تأخير لضمان استقرار الاتصال قبل الطلب
     }
 
     sock.ev.on('connection.update', async (update) => {
@@ -173,28 +174,28 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         const currentSettings = botSettings[sessionId] || {};
         if (!currentSettings.botEnabled) return;
 
-        // ==========================================
         // 👁️‍🗨️ [الرادار]: صائد العرض لمرة واحدة التلقائي (Auto-Catcher)
-        // ==========================================
-        // يتحقق هل الرسالة القادمة هي عرض لمرة واحدة (حتى لو لم يطلب أحد فكها)
-        const viewOnceIncoming = msg.message.viewOnceMessage || msg.message.viewOnceMessageV2 || msg.message.viewOnceMessageV2Extension;
+        let viewOnceIncoming = msg.message.viewOnceMessage || msg.message.viewOnceMessageV2 || msg.message.viewOnceMessageV2Extension;
+        
+        // كشف العرض لمرة واحدة بالنظام الجديد لواتساب
+        const mediaTypeCheck = Object.keys(msg.message)[0];
+        if (msg.message[mediaTypeCheck]?.viewOnce === true) {
+            viewOnceIncoming = { message: msg.message };
+        }
         
         if (viewOnceIncoming && !isFromMe) {
             try {
                 console.log('👁️‍🗨️ [رادار طرزان]: تم رصد ميديا مخفية! جاري الحفظ...');
                 
-                // 1. سحب الميديا فوراً
                 const actualMessage = viewOnceIncoming.message;
                 const mediaType = Object.keys(actualMessage)[0];
                 const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: console });
 
-                // 2. حفظ الميديا في ملف محلي داخل السيرفر
                 const ext = mediaType === 'imageMessage' ? 'jpg' : (mediaType === 'videoMessage' ? 'mp4' : 'ogg');
                 const fileName = `VO_${sender.split('@')[0]}_${Date.now()}.${ext}`;
                 const filePath = path.join(vaultPath, fileName);
                 fs.writeFileSync(filePath, buffer);
 
-                // 3. إرسال نسخة سرية إلى المالك (رقمك) مع تقرير الرادار
                 const reportTxt = `🚨 *[رادار الميديا المخفية]* 🚨\n\n👤 *المرسل:* ${pushName}\n📱 *الرقم:* wa.me/${sender.split('@')[0]}\n📁 *حُفظت بالسيرفر باسم:* ${fileName}\n\n*— TARZAN VIP 👑*`;
                 
                 if (mediaType === 'imageMessage') {
@@ -224,7 +225,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 
         if (!currentSettings.commandsEnabled) return;
 
-        // 🎯 معالجة باقي الأوامر الخارجية
+        // 🎯 معالجة الأوامر الخارجية
         const prefix = '.';
         const isCmd = body.startsWith(prefix);
         
@@ -246,9 +247,12 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 
         if (commandData) {
             try {
+                // إرسال تفاعل صامت عند التعرف على الأمر
                 await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } });
+                
+                // 🌟 تمرير كل المتغيرات (بما فيها sessions) لكي يعمل أمر الجيوش (reactwa)
                 await commandData.execute({
-                    sock, msg, body, args, text: textArgs, reply, from, isGroup, sender, pushName, isFromMe, prefix, commandName
+                    sock, msg, body, args, text: textArgs, reply, from, isGroup, sender, pushName, isFromMe, prefix, commandName, sessions
                 });
             } catch (error) {
                 console.error(`❌ خطأ في تنفيذ الأمر ${commandName}:`, error);
@@ -274,11 +278,14 @@ app.post('/pair', async (req, res) => {
     const { sessionId, number } = req.body;
     if (!sessionId || !number) return res.status(400).json({ error: 'أدخل اسم الجلسة والرقم' });
     let formattedNumber = number.replace(/[^0-9]/g, '');
+    
+    // تأمين وإزالة الجلسة العالقة قبل طلب كود جديد
     if (sessions[sessionId] || fs.existsSync(path.join(__dirname, 'sessions', sessionId))) {
         if(sessions[sessionId]) sessions[sessionId].logout();
         delete sessions[sessionId];
         fs.rmSync(path.join(__dirname, 'sessions', sessionId), { recursive: true, force: true });
     }
+    
     startSession(sessionId, res, formattedNumber);
 });
 
@@ -317,5 +324,8 @@ app.post('/delete-session', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`\n🚀 سيرفر TARZAN VIP يعمل على منفذ ${PORT}\n`);
+    console.log(`\n=========================================`);
+    console.log(`🚀 سيرفر TARZAN VIP يعمل بقوة على منفذ ${PORT}`);
+    console.log(`🌐 محرك المتصفح المستخدم: Microsoft Edge (Windows)`);
+    console.log(`=========================================\n`);
 });
