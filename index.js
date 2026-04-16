@@ -11,7 +11,9 @@ const {
     fetchLatestBaileysVersion,
     makeCacheableSignalKeyStore,
     downloadMediaMessage,
-    jidNormalizedUser
+    jidNormalizedUser,
+    generateWAMessageFromContent,
+    proto
 } = require('@whiskeysockets/baileys');
 
 const app = express();
@@ -20,7 +22,7 @@ const MASTER_PASSWORD = 'tarzanbot';
 const sessions = {};
 const msgStore = new Map(); 
 
-// ✅ 1. نظام حفظ الإعدادات
+// ✅ 1. نظام حفظ الإعدادات وقواعد البيانات
 const settingsPath = path.join(__dirname, 'settings.json');
 let botSettings = {};
 if (fs.existsSync(settingsPath)) { botSettings = JSON.parse(fs.readFileSync(settingsPath, 'utf8')); } 
@@ -33,7 +35,6 @@ function generateSessionPassword() { return 'VIP-' + Math.random().toString(36).
 const vaultPath = path.join(__dirname, 'ViewOnce_Vault');
 if (!fs.existsSync(vaultPath)) fs.mkdirSync(vaultPath);
 
-// تنظيف الذاكرة المؤقتة كل ساعتين لمنع ثقل السيرفر
 setInterval(() => { msgStore.clear(); console.log('🧹 تم تنظيف الذاكرة المؤقتة للرسائل'); }, 2 * 60 * 60 * 1000);
 
 app.use(express.static('public'));
@@ -73,16 +74,16 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
     const sessionPath = path.join(__dirname, 'sessions', sessionId);
     if (!fs.existsSync(sessionPath)) fs.mkdirSync(sessionPath, { recursive: true });
 
-    // تهيئة الإعدادات الخاصة بالجلسة الجديدة (مع إضافة مصفوفة الذكاء الاصطناعي)
+    // 🌟 [إضافة مفتاح الذكاء الاصطناعي للإعدادات الافتراضية]
     if (!botSettings[sessionId]) {
         botSettings[sessionId] = { 
             password: generateSessionPassword(), 
             botEnabled: true, 
             commandsEnabled: true, 
+            aiEnabled: false, // 🧠 معطل افتراضياً حتى تفعله من الموقع
             autoReact: false, 
             reactEmoji: '❤️', 
-            welcomeSent: false,
-            aiChats: [] 
+            welcomeSent: false
         };
         saveSettings();
     }
@@ -102,7 +103,6 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
     sessions[sessionId] = sock;
     sock.ev.on('creds.update', saveCreds);
 
-    // طلب كود الاقتران الفوري
     if (pairingNumber && !sock.authState.creds.registered) {
         setTimeout(async () => {
             try {
@@ -142,7 +142,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
     });
 
     // ==========================================
-    // 🛡️ 5. مضاد الحذف الجبار (Anti-Delete) كامل بدون نقص
+    // 🛡️ 5. مضاد الحذف الجبار (Anti-Delete)
     // ==========================================
     sock.ev.on('messages.update', async updates => {
         for (const { key, update } of updates) {
@@ -159,15 +159,13 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
                     const alertText = `🚫 *[رسالة محذوفة]* 🚫\n👤 *الاسم:* ${name}\n📱 *الرقم:* wa.me/${number}\n🕒 *الوقت:* ${time}\n👇 *المحتوى:*`;
                     await sock.sendMessage(selfId, { text: alertText });
                     await sock.sendMessage(selfId, { forward: storedMsg });
-                } catch (err) {
-                    console.error('خطأ في مضاد الحذف:', err);
-                }
+                } catch (err) {}
             }
         }
     });
 
     // ==========================================
-    // 🔥 6. استقبال الرسائل (رادار + ذكاء اصطناعي + أوامر)
+    // 🔥 6. استقبال الرسائل المركزية
     // ==========================================
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
         if (type !== 'notify') return;
@@ -181,13 +179,12 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         const selfId = jidNormalizedUser(sock.user.id);
         const isFromMe = msg.key.fromMe || sender === selfId;
 
-        // حفظ الرسالة في الذاكرة لكي يعمل مضاد الحذف
         msgStore.set(`${from}_${msg.key.id}`, msg);
 
         const currentSettings = botSettings[sessionId] || {};
-        if (!currentSettings.botEnabled) return; // توقف تام إذا كان البوت معطل من اللوحة
+        if (!currentSettings.botEnabled) return;
 
-        // 👁️‍🗨️ [الرادار]: صائد العرض لمرة واحدة التلقائي (كامل بدون نقص)
+        // 👁️‍🗨️ [الرادار]: صائد العرض لمرة واحدة التلقائي
         let viewOnceIncoming = msg.message.viewOnceMessage || msg.message.viewOnceMessageV2 || msg.message.viewOnceMessageV2Extension;
         const mediaTypeCheck = Object.keys(msg.message)[0];
         if (msg.message[mediaTypeCheck]?.viewOnce === true) {
@@ -196,31 +193,23 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         
         if (viewOnceIncoming && !isFromMe) {
             try {
-                console.log('👁️‍🗨️ [رادار طرزان]: تم رصد ميديا مخفية! جاري الحفظ...');
                 const actualMessage = viewOnceIncoming.message;
                 const mediaType = Object.keys(actualMessage)[0];
                 const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: console });
 
                 const ext = mediaType === 'imageMessage' ? 'jpg' : (mediaType === 'videoMessage' ? 'mp4' : 'ogg');
                 const fileName = `VO_${sender.split('@')[0]}_${Date.now()}.${ext}`;
-                const filePath = path.join(vaultPath, fileName);
-                fs.writeFileSync(filePath, buffer);
+                fs.writeFileSync(path.join(vaultPath, fileName), buffer);
 
-                const reportTxt = `🚨 *[رادار الميديا المخفية]* 🚨\n\n👤 *المرسل:* ${pushName}\n📱 *الرقم:* wa.me/${sender.split('@')[0]}\n📁 *حُفظت بالسيرفر باسم:* ${fileName}\n\n*— TARZAN VIP 👑*`;
+                const reportTxt = `🚨 *[رادار الميديا المخفية]* 🚨\n\n👤 *المرسل:* ${pushName}\n📱 *الرقم:* wa.me/${sender.split('@')[0]}\n📁 *حُفظت باسم:* ${fileName}\n\n*— TARZAN VIP 👑*`;
                 
-                if (mediaType === 'imageMessage') {
-                    await sock.sendMessage(selfId, { image: buffer, caption: reportTxt });
-                } else if (mediaType === 'videoMessage') {
-                    await sock.sendMessage(selfId, { video: buffer, caption: reportTxt });
-                } else if (mediaType === 'audioMessage') {
-                    await sock.sendMessage(selfId, { audio: buffer, mimetype: 'audio/mpeg', ptt: true });
-                }
-            } catch (err) {
-                console.error('❌ خطأ في الرادار التلقائي:', err);
-            }
+                if (mediaType === 'imageMessage') await sock.sendMessage(selfId, { image: buffer, caption: reportTxt });
+                else if (mediaType === 'videoMessage') await sock.sendMessage(selfId, { video: buffer, caption: reportTxt });
+                else if (mediaType === 'audioMessage') await sock.sendMessage(selfId, { audio: buffer, mimetype: 'audio/mpeg', ptt: true });
+            } catch (err) { console.error('❌ خطأ في الرادار التلقائي:', err); }
         }
 
-        // التفاعل التلقائي مع الرسائل (إذا كان مفعلاً)
+        // التفاعل التلقائي
         if (currentSettings.autoReact && !isFromMe && !viewOnceIncoming) {
             try { await sock.sendMessage(from, { react: { text: currentSettings.reactEmoji || '❤️', key: msg.key } }); } catch(e) {}
         }
@@ -232,54 +221,62 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
             return await sock.sendMessage(from, { text: text }, { quoted: msg });
         };
 
-        // 🧠 7. نظام الذكاء الاصطناعي التلقائي
-        if (!currentSettings.aiChats) currentSettings.aiChats = [];
-
-        // تفعيل وإلغاء الذكاء الاصطناعي
-        if (isFromMe) {
-            if (body.trim() === '.تفعيل الذكاء') {
-                if (!currentSettings.aiChats.includes(from)) {
-                    currentSettings.aiChats.push(from);
-                    saveSettings();
-                }
-                return reply('🧠 *تم تفعيل وضع الذكاء الاصطناعي التلقائي!*\nسأقوم الآن بالرد على أي رسالة تُكتب في هذه المحادثة.');
-            }
-            if (body.trim() === '.تعطيل الذكاء') {
-                if (currentSettings.aiChats.includes(from)) {
-                    currentSettings.aiChats = currentSettings.aiChats.filter(jid => jid !== from);
-                    saveSettings();
-                }
-                return reply('🛑 *تم تعطيل الذكاء الاصطناعي.* سأعود للاستجابة للأوامر العادية فقط.');
-            }
-        }
-
         const isCmd = body.startsWith('.');
-        const isAiActive = currentSettings.aiChats.includes(from);
 
-        // إذا كان الذكاء مفعل، سيرد على الرسائل التي ليست أوامر
-        if (isAiActive && !isCmd && !isFromMe && body.trim() !== '' && !viewOnceIncoming) {
+        // ==========================================
+        // 🧠 7. نظام الذكاء الاصطناعي (الثلاثي الأبعاد المستحيل تعطله)
+        // ==========================================
+        // يعمل إذا كان مفعل من اللوحة، والرسالة ليست أمر، وليست صورة مخفية، وليست منك
+        if (currentSettings.aiEnabled && !isCmd && !isFromMe && body.trim() !== '' && !viewOnceIncoming) {
             try {
-                await sock.sendPresenceUpdate('composing', from);
-                const apiUrl = `https://bk9.fun/ai/gemini?q=${encodeURIComponent(body)}`;
-                const aiRes = await axios.get(apiUrl);
+                await sock.sendPresenceUpdate('composing', from); // يظهر أنه يكتب...
+                
+                let aiResponseText = '';
+                const query = encodeURIComponent(body);
 
-                if (aiRes.data && aiRes.data.BK9) {
-                    await reply(aiRes.data.BK9);
-                } else {
-                    const altRes = await axios.get(`https://api.simsimi.net/v2/?text=${encodeURIComponent(body)}&lc=ar`);
-                    await reply(altRes.data.success || 'عقلي مشوش قليلاً الآن...');
+                try {
+                    // المحاولة 1: API مستقر جداً (Gemini)
+                    const res1 = await axios.get(`https://api.ryzendesu.vip/api/ai/gemini?text=${query}`);
+                    aiResponseText = res1.data.response || res1.data.answer;
+                } catch (e1) {
+                    console.log('⚠️ المحاولة 1 فشلت، جاري المحاولة 2...');
+                    try {
+                        // المحاولة 2: API قوي كبديل (Gemini)
+                        const res2 = await axios.get(`https://bk9.fun/ai/gemini?q=${query}`);
+                        aiResponseText = res2.data.BK9;
+                    } catch (e2) {
+                        console.log('⚠️ المحاولة 2 فشلت، جاري المحاولة 3...');
+                        try {
+                            // المحاولة 3: الشات بوت العربي كملجأ أخير
+                            const res3 = await axios.get(`https://api.simsimi.net/v2/?text=${query}&lc=ar`);
+                            aiResponseText = res3.data.success;
+                        } catch (e3) {
+                            aiResponseText = 'عقلي متعب قليلاً بسبب الضغط على السيرفرات، جرب التحدث معي لاحقاً 🧠💤';
+                        }
+                    }
                 }
+
+                // الرد بالنص الذي تم جلبه
+                if (aiResponseText && !aiResponseText.includes('Simsimi')) {
+                    await reply(aiResponseText);
+                } else if (aiResponseText) {
+                   await reply(aiResponseText.replace('Simsimi', 'طرزان'));
+                } else {
+                    await reply('لم أستطع فهم ذلك 🤔');
+                }
+
             } catch (error) {
-                console.error('❌ خطأ في الرد التلقائي للذكاء الاصطناعي:', error.message);
+                console.error('❌ خطأ في معالج الذكاء الاصطناعي:', error.message);
             }
-            return; // إيقاف البحث عن أوامر أخرى بعد رد الذكاء الاصطناعي
+            return; // 🛑 إيقاف الكود هنا، لمنع البحث عن أوامر
         }
 
-        // 🎯 8. معالجة الأوامر الخارجية (إذا كانت مفعلة)
+        // ==========================================
+        // 🎯 8. معالجة الأوامر الخارجية
+        // ==========================================
         if (!currentSettings.commandsEnabled) return;
 
         let selectedId = msg.message.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson ? JSON.parse(msg.message.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson).id : '';
-        
         let commandName = '';
         let args = [];
         let textArgs = '';
@@ -298,17 +295,15 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 
         if (commandData) {
             try {
-                // إرسال تفاعل التحميل فقط إذا لم تكن الرسالة عرض لمرة واحدة (لمنع الفضح)
-                if (!viewOnceIncoming && commandName !== '🌚' && commandName !== 'vv') {
+                if (commandName !== '🌚' && commandName !== 'vv') {
                     await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } });
                 }
                 
-                // تمرير كل المتغيرات (مهم جداً لأمر reactwa)
                 await commandData.execute({
                     sock, msg, body, args, text: textArgs, reply, from, isGroup, sender, pushName, isFromMe, prefix: '.', commandName, sessions
                 });
             } catch (error) {
-                console.error(`❌ خطأ في تنفيذ الأمر ${commandName}:`, error);
+                console.error(`❌ خطأ في الأمر ${commandName}:`, error);
                 if (commandName !== '🌚' && commandName !== 'vv') {
                     await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
                 }
@@ -320,27 +315,24 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 }
 
 // ==========================================
-// 🌐 9. API Endpoints (لوحة التحكم بالموقع)
+// 🌐 9. API Endpoints (مع إضافة خيار الذكاء الاصطناعي)
 // ==========================================
 app.post('/create-session', (req, res) => {
     const { sessionId } = req.body;
     if (!sessionId) return res.status(400).json({ error: 'أدخل اسم الجلسة' });
-    if (sessions[sessionId]) return res.status(400).json({ error: 'الجلسة متصلة بالفعل' });
     startSession(sessionId, res);
 });
 
 app.post('/pair', async (req, res) => {
     const { sessionId, number } = req.body;
-    if (!sessionId || !number) return res.status(400).json({ error: 'أدخل اسم الجلسة والرقم' });
+    if (!sessionId || !number) return res.status(400).json({ error: 'أدخل الجلسة والرقم' });
     let formattedNumber = number.replace(/[^0-9]/g, '');
     
-    // إزالة الجلسة العالقة قبل طلب كود جديد
     if (sessions[sessionId] || fs.existsSync(path.join(__dirname, 'sessions', sessionId))) {
         if(sessions[sessionId]) sessions[sessionId].logout();
         delete sessions[sessionId];
         fs.rmSync(path.join(__dirname, 'sessions', sessionId), { recursive: true, force: true });
     }
-    
     startSession(sessionId, res, formattedNumber);
 });
 
@@ -348,18 +340,20 @@ app.post('/api/settings/get', (req, res) => {
     const { sessionId, password } = req.body;
     const settings = botSettings[sessionId];
     if (!settings) return res.status(404).json({ error: 'الجلسة غير موجودة' });
-    if (settings.password !== password && password !== MASTER_PASSWORD) return res.status(401).json({ error: 'كلمة مرور الجلسة غير صحيحة' });
+    if (settings.password !== password && password !== MASTER_PASSWORD) return res.status(401).json({ error: 'كلمة مرور خاطئة' });
     res.json(settings);
 });
 
+// 🌟 [تحديث هام]: استقبال حفظ حالة الذكاء الاصطناعي من الموقع
 app.post('/api/settings/save', (req, res) => {
-    const { sessionId, password, botEnabled, commandsEnabled, autoReact, reactEmoji } = req.body;
+    const { sessionId, password, botEnabled, commandsEnabled, aiEnabled, autoReact, reactEmoji } = req.body;
     const settings = botSettings[sessionId];
     if (!settings) return res.status(404).json({ error: 'الجلسة غير موجودة' });
-    if (settings.password !== password && password !== MASTER_PASSWORD) return res.status(401).json({ error: 'كلمة مرور غير صحيحة' });
+    if (settings.password !== password && password !== MASTER_PASSWORD) return res.status(401).json({ error: 'كلمة مرور خاطئة' });
     
     botSettings[sessionId].botEnabled = !!botEnabled;
     botSettings[sessionId].commandsEnabled = !!commandsEnabled;
+    botSettings[sessionId].aiEnabled = !!aiEnabled; // حفظ حالة الذكاء
     botSettings[sessionId].autoReact = !!autoReact;
     botSettings[sessionId].reactEmoji = reactEmoji || '❤️';
     saveSettings();
@@ -370,7 +364,7 @@ app.get('/sessions', (req, res) => { res.json({ count: Object.keys(sessions).len
 
 app.post('/delete-session', (req, res) => {
     const { sessionId, password } = req.body;
-    if (password !== MASTER_PASSWORD) return res.status(401).json({ error: 'كلمة المرور الرئيسية غير صحيحة' });
+    if (password !== MASTER_PASSWORD) return res.status(401).json({ error: 'كلمة مرور السيرفر خاطئة' });
     const sessionPath = path.join(__dirname, 'sessions', sessionId);
     if (sessions[sessionId]) { sessions[sessionId].logout(); delete sessions[sessionId]; }
     if (botSettings[sessionId]) { delete botSettings[sessionId]; saveSettings(); }
@@ -381,6 +375,5 @@ app.post('/delete-session', (req, res) => {
 app.listen(PORT, () => {
     console.log(`\n=========================================`);
     console.log(`🚀 سيرفر TARZAN VIP يعمل بقوة على منفذ ${PORT}`);
-    console.log(`🌐 محرك المتصفح المستخدم: Microsoft Edge (Windows)`);
     console.log(`=========================================\n`);
 });
