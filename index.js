@@ -4,7 +4,8 @@ const path = require('path');
 const qrCode = require('qrcode');
 const moment = require('moment-timezone');
 const axios = require('axios');
-const pino = require('pino'); // 🛡️ ضروري لكتم السجلات ومنع انهيار السيرفر
+const pino = require('pino'); // 🛡️ كتم السجلات لمنع اختناق المعالج
+const { GoogleGenerativeAI } = require('@google/generative-ai'); // 🧠 مكتبة جوجل الرسمية (الحل النووي)
 
 const {
     default: makeWASocket,
@@ -28,7 +29,7 @@ const MASTER_PASSWORD = 'tarzanbot';
 const sessions = {};
 const msgStore = new Map(); 
 
-// ✅ 1. نظام حفظ الإعدادات وقواعد البيانات
+// ✅ 1. نظام حفظ الإعدادات (مع دعم المفتاح العالمي)
 const settingsPath = path.join(__dirname, 'settings.json');
 let botSettings = {};
 if (fs.existsSync(settingsPath)) { 
@@ -47,23 +48,23 @@ if (!botSettings.GLOBAL_CONFIG) {
 function saveSettings() { fs.writeFileSync(settingsPath, JSON.stringify(botSettings, null, 2)); }
 function generateSessionPassword() { return 'VIP-' + Math.random().toString(36).substring(2, 8).toUpperCase(); }
 
-// ✅ 2. إنشاء مجلد الخزنة السرية للميديا (ViewOnce Vault)
+// ✅ 2. مجلد الخزنة للميديا المخفية
 const vaultPath = path.join(__dirname, 'ViewOnce_Vault');
 if (!fs.existsSync(vaultPath)) fs.mkdirSync(vaultPath);
 
-// 🛡️ 3. نظام تنظيف الذاكرة الذكي (يتحمل 100+ جلسة)
+// 🛡️ 3. نظام تفريغ الذاكرة الذكي (لتحمل 100+ جلسة)
 setInterval(() => { 
     if (msgStore.size > 5000) {
         msgStore.clear(); 
-        console.log('🧹 [حماية السيرفر] تم تفريغ الذاكرة المؤقتة للرسائل لمنع استهلاك الرام');
+        console.log('🧹 [حماية السيرفر] تم تفريغ الذاكرة المؤقتة للرسائل لمنع اختناق الرام');
     }
-}, 30 * 60 * 1000); // يفحص كل 30 دقيقة
+}, 30 * 60 * 1000);
 
 app.use(express.static('public'));
 app.use(express.json());
 
 // ==========================================
-// 🚀 4. نظام تحميل الأوامر الدقيق (Command Handler)
+// 🚀 4. معالج الأوامر
 // ==========================================
 const commandsMap = new Map();
 const commandsPath = path.join(__dirname, 'commands');
@@ -90,7 +91,7 @@ function loadCommands() {
 loadCommands();
 
 // ==========================================
-// ⚙️ 5. تشغيل الجلسة والقلب النابض
+// ⚙️ 5. تشغيل الجلسات
 // ==========================================
 async function startSession(sessionId, res = null, pairingNumber = null) {
     const sessionPath = path.join(__dirname, 'sessions', sessionId);
@@ -101,7 +102,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
             password: generateSessionPassword(), 
             botEnabled: true, 
             commandsEnabled: true, 
-            aiEnabled: false, // 🧠 معطل افتراضياً حتى يفعله المالك من الموقع
+            aiEnabled: false, 
             autoReact: false, 
             reactEmoji: '❤️', 
             welcomeSent: false
@@ -115,12 +116,12 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
     const sock = makeWASocket({
         version,
         auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })) },
-        logger: pino({ level: 'silent' }), // 🛡️ كتم السجلات لمنع اختناق السيرفر
+        logger: pino({ level: 'silent' }), // 🛡️ سر استقرار السيرفر
         printQRInTerminal: false,
         markOnlineOnConnect: true,
-        browser: ['Windows', 'Edge', '10.0'], // 🌟 محرك Microsoft Edge لكود الاقتران
+        browser: ['Windows', 'Edge', '10.0'], // 🌟 Edge لمنع حظر واتساب
         syncFullHistory: false,
-        generateHighQualityLinkPreviews: false // تقليل استهلاك البيانات
+        generateHighQualityLinkPreviews: false
     });
 
     sessions[sessionId] = sock;
@@ -152,7 +153,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         }
 
         if (connection === 'open') {
-            console.log(`✅ الجلسة ${sessionId} متصلة باستقرار!`);
+            console.log(`✅ الجلسة ${sessionId} متصلة بنجاح!`);
             const selfId = jidNormalizedUser(sock.user.id);
             try { await sock.updateProfileStatus(`🤖 طرزان الواقدي VIP | يعمل الآن`); } catch (e) {}
 
@@ -165,7 +166,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
     });
 
     // ==========================================
-    // 🛡️ 6. مضاد الحذف الجبار (النسخة الفخمة)
+    // 🛡️ 6. مضاد الحذف الجبار
     // ==========================================
     sock.ev.on('messages.update', async updates => {
         for (const { key, update } of updates) {
@@ -202,20 +203,15 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         const selfId = jidNormalizedUser(sock.user.id);
         const isFromMe = msg.key.fromMe || sender === selfId;
 
-        // حفظ في الذاكرة فقط إذا لم تتجاوز الحد لحماية السيرفر
-        if (msgStore.size < 5000) {
-            msgStore.set(`${from}_${msg.key.id}`, msg);
-        }
+        if (msgStore.size < 5000) msgStore.set(`${from}_${msg.key.id}`, msg);
 
         const currentSettings = botSettings[sessionId] || {};
         if (!currentSettings.botEnabled) return;
 
-        // 👁️‍🗨️ [الرادار]: صائد العرض لمرة واحدة التلقائي (النسخة الفخمة)
+        // 👁️‍🗨️ [الرادار]: صائد العرض لمرة واحدة
         let viewOnceIncoming = msg.message.viewOnceMessage || msg.message.viewOnceMessageV2 || msg.message.viewOnceMessageV2Extension;
         const mediaTypeCheck = Object.keys(msg.message)[0];
-        if (msg.message[mediaTypeCheck]?.viewOnce === true) {
-            viewOnceIncoming = { message: msg.message };
-        }
+        if (msg.message[mediaTypeCheck]?.viewOnce === true) viewOnceIncoming = { message: msg.message };
         
         if (viewOnceIncoming && !isFromMe) {
             try {
@@ -235,7 +231,6 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
             } catch (err) { console.error('❌ خطأ في الرادار التلقائي:', err); }
         }
 
-        // التفاعل التلقائي
         if (currentSettings.autoReact && !isFromMe && !viewOnceIncoming) {
             try { await sock.sendMessage(from, { react: { text: currentSettings.reactEmoji || '❤️', key: msg.key } }); } catch(e) {}
         }
@@ -249,68 +244,54 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         const isCmd = body.startsWith('.');
 
         // ==========================================
-        // 🧠 8. نظام الذكاء الاصطناعي (متوافق مع مفاتيح 2026 الجديدة عبر REST)
+        // 🧠 8. الذكاء الاصطناعي (الحل النووي במكتبة جوجل الرسمية)
         // ==========================================
         if (currentSettings.aiEnabled && !isCmd && !isFromMe && body.trim() !== '' && !viewOnceIncoming) {
             try {
-                await sock.sendPresenceUpdate('composing', from); // يظهر أنه يكتب...
+                await sock.sendPresenceUpdate('composing', from); 
                 
                 let aiResponseText = '';
                 const query = body.trim();
                 const apiKey = botSettings.GLOBAL_CONFIG?.geminiApiKey;
 
-                // 🌟 المحاولة 1: استخدام مفتاحك الرسمي (Gemini) بتنسيق REST الحديث
+                // 🌟 المحاولة الأساسية: استخدام المكتبة الرسمية (لضمان توافق مفاتيح 2026)
                 if (apiKey && apiKey.length > 20) {
                     try {
-                        const googleUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-                        const payload = {
-                            contents: [{ parts: [{ text: query }] }]
-                        };
-                        
-                        const googleRes = await axios.post(googleUrl, payload, {
-                            headers: { 'Content-Type': 'application/json' }
-                        });
-                        
-                        aiResponseText = googleRes.data.candidates[0].content.parts[0].text;
+                        const genAI = new GoogleGenerativeAI(apiKey);
+                        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                        const result = await model.generateContent(query);
+                        aiResponseText = result.response.text();
                     } catch (apiErr) {
-                        console.error('⚠️ فشل المفتاح الرسمي:', apiErr.response?.data?.error?.message || apiErr.message);
-                        console.log('جاري التحويل للبدائل المجانية...');
+                        console.error('⚠️ فشل محرك جوجل الرسمي:', apiErr.message);
                     }
                 }
 
-                // 🌟 المحاولة 2: السيرفرات المجانية (تعمل كدرع إذا لم تضع مفتاحاً أو إذا تعطل المفتاح)
+                // 🌟 المحاولة البديلة (API جديد وقوي)
                 if (!aiResponseText) {
                     try {
-                        const res1 = await axios.get(`https://api.ryzendesu.vip/api/ai/gemini?text=${encodeURIComponent(query)}`);
-                        aiResponseText = res1.data.response || res1.data.answer;
-                    } catch (e1) {
-                        try {
-                            const res2 = await axios.get(`https://bk9.fun/ai/gemini?q=${encodeURIComponent(query)}`);
-                            aiResponseText = res2.data.BK9;
-                        } catch (e2) {
-                            try {
-                                const res3 = await axios.get(`https://api.simsimi.net/v2/?text=${encodeURIComponent(query)}&lc=ar`);
-                                aiResponseText = res3.data.success;
-                            } catch (e3) {
-                                aiResponseText = 'عقلي متعب قليلاً بسبب الضغط على السيرفرات، جرب التحدث معي لاحقاً 🧠💤';
-                            }
+                        const fallbackUrl = `https://aemt.me/gemini?text=${encodeURIComponent(query)}`;
+                        const fallbackRes = await axios.get(fallbackUrl);
+                        if (fallbackRes.data && fallbackRes.data.status && fallbackRes.data.result) {
+                            aiResponseText = fallbackRes.data.result;
+                        } else {
+                            throw new Error('API فشل');
                         }
+                    } catch (eFallback) {
+                        aiResponseText = 'عقلي في حالة صيانة وتحديث الآن، السيرفرات مشغولة 🧠⏳';
                     }
                 }
 
-                // إرسال الرد النهائي وتصفية الكلمات
-                if (aiResponseText && !aiResponseText.includes('Simsimi')) {
+                // إرسال الرد
+                if (aiResponseText) {
                     await reply(aiResponseText);
-                } else if (aiResponseText) {
-                   await reply(aiResponseText.replace(/Simsimi/gi, 'طرزان'));
                 } else {
-                    await reply('عذراً، لم أتمكن من استيعاب ما قلته 🤔');
+                    await reply('حدث خطأ غير متوقع في نظام التفكير 🤔');
                 }
 
             } catch (error) {
                 console.error('❌ خطأ في معالج الذكاء الاصطناعي:', error.message);
             }
-            return; // 🛑 إيقاف الكود هنا، لمنع البحث عن أوامر
+            return; 
         }
 
         // ==========================================
@@ -337,12 +318,10 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 
         if (commandData) {
             try {
-                // 🌟 إعادة تفاعل (قيد التحميل) لجميع الأوامر، باستثناء أمر استخراج الميديا (الشبحي)
                 if (commandName !== '🌚' && commandName !== 'vv') {
                     await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } });
                 }
                 
-                // تمرير كافة المتغيرات المهمة للأوامر
                 await commandData.execute({
                     sock, msg, body, args, text: textArgs, reply, from, isGroup, sender, pushName, isFromMe, prefix: '.', commandName, sessions, botSettings, saveSettings
                 });
@@ -418,7 +397,7 @@ app.post('/delete-session', (req, res) => {
 app.listen(PORT, () => {
     console.log(`\n=========================================`);
     console.log(`🚀 سيرفر TARZAN VIP يعمل بقوة على منفذ ${PORT}`);
-    console.log(`🛡️ وضع الحماية القصوى مفعل (Anti-Crash & Garbage Collector)`);
-    console.log(`🧠 الذكاء الاصطناعي مهيأ للعمل (متوافق مع مفاتيح 2026 + بدائل مجانية)`);
+    console.log(`🛡️ وضع الحماية من الانهيار مفعل بنجاح`);
+    console.log(`🧠 نظام الذكاء الاصطناعي (الحل النووي) مدمج وجاهز`);
     console.log(`=========================================\n`);
 });
