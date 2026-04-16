@@ -5,7 +5,6 @@ const qrCode = require('qrcode');
 const moment = require('moment-timezone');
 const axios = require('axios');
 const pino = require('pino'); // 🛡️ ضروري لكتم السجلات ومنع انهيار السيرفر
-const { GoogleGenerativeAI } = require('@google/generative-ai'); // 🧠 مكتبة جوجل الرسمية
 
 const {
     default: makeWASocket,
@@ -119,7 +118,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         logger: pino({ level: 'silent' }), // 🛡️ كتم السجلات لمنع اختناق السيرفر
         printQRInTerminal: false,
         markOnlineOnConnect: true,
-        browser: ['Windows', 'Edge', '10.0'], // 🌟 محرك Microsoft Edge
+        browser: ['Windows', 'Edge', '10.0'], // 🌟 محرك Microsoft Edge لكود الاقتران
         syncFullHistory: false,
         generateHighQualityLinkPreviews: false // تقليل استهلاك البيانات
     });
@@ -250,7 +249,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         const isCmd = body.startsWith('.');
 
         // ==========================================
-        // 🧠 8. نظام الذكاء الاصطناعي (مزدوج: رسمي + بديل مجاني)
+        // 🧠 8. نظام الذكاء الاصطناعي (متوافق مع مفاتيح 2026 الجديدة عبر REST)
         // ==========================================
         if (currentSettings.aiEnabled && !isCmd && !isFromMe && body.trim() !== '' && !viewOnceIncoming) {
             try {
@@ -260,15 +259,22 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
                 const query = body.trim();
                 const apiKey = botSettings.GLOBAL_CONFIG?.geminiApiKey;
 
-                // 🌟 المحاولة 1: استخدام مفتاحك الرسمي (Gemini) إذا تم إدخاله
+                // 🌟 المحاولة 1: استخدام مفتاحك الرسمي (Gemini) بتنسيق REST الحديث
                 if (apiKey && apiKey.length > 20) {
                     try {
-                        const genAI = new GoogleGenerativeAI(apiKey);
-                        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-                        const result = await model.generateContent(query);
-                        aiResponseText = result.response.text();
+                        const googleUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+                        const payload = {
+                            contents: [{ parts: [{ text: query }] }]
+                        };
+                        
+                        const googleRes = await axios.post(googleUrl, payload, {
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                        
+                        aiResponseText = googleRes.data.candidates[0].content.parts[0].text;
                     } catch (apiErr) {
-                        console.log('⚠️ فشل المفتاح الرسمي (قد يكون هناك ضغط)، جاري التحويل للمجاني...');
+                        console.error('⚠️ فشل المفتاح الرسمي:', apiErr.response?.data?.error?.message || apiErr.message);
+                        console.log('جاري التحويل للبدائل المجانية...');
                     }
                 }
 
@@ -413,6 +419,6 @@ app.listen(PORT, () => {
     console.log(`\n=========================================`);
     console.log(`🚀 سيرفر TARZAN VIP يعمل بقوة على منفذ ${PORT}`);
     console.log(`🛡️ وضع الحماية القصوى مفعل (Anti-Crash & Garbage Collector)`);
-    console.log(`🧠 الذكاء الاصطناعي مهيأ للعمل (مفتاح رسمي + 3 بدائل مجانية)`);
+    console.log(`🧠 الذكاء الاصطناعي مهيأ للعمل (متوافق مع مفاتيح 2026 + بدائل مجانية)`);
     console.log(`=========================================\n`);
 });
