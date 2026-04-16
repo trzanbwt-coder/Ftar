@@ -10,7 +10,7 @@
   "dependencies": {
     "@distube/ytdl-core": "^4.14.4",
     "@google/generative-ai": "^0.14.0",
-    "@whiskeysockets/baileys": "^6.7.5",
+    "@whiskeysockets/baileys": "latest",
     "axios": "^1.7.2",
     "canvas": "^2.11.2",
     "chalk": "^4.1.2",
@@ -23,6 +23,7 @@
     "link-preview-js": "^3.0.5",
     "mime-types": "^2.1.35",
     "moment-timezone": "^0.5.45",
+    "node-cache": "^5.1.2",
     "node-cron": "^3.0.3",
     "pino": "^9.0.0",
     "qrcode": "^1.5.3",
