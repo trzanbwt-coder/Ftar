@@ -1,52 +1,70 @@
-const axios = require('axios');
+const delay = ms => new Promise(res => setTimeout(res, ms));
 
 module.exports = {
-    name: 'ytmp3',
-    aliases: ['يوتيوب', 'صوتيات', 'mp3', 'اغنية'],
-    execute: async ({ sock, msg, args, text, reply, from }) => {
+    name: 'type',
+    aliases: ['اكتب', 'شبح', 'طباعة'],
+    execute: async ({ sock, msg, text, reply, from, isOwner }) => {
         
-        if (!text || !text.includes('youtu')) {
-            return reply('❌ *يرجى إرسال رابط صحيح من اليوتيوب.*\n*مثال:* `.يوتيوب https://youtu.be/...`');
+        // 1. التحقق من الصلاحيات (يُفضل للمطور فقط لأنها عملية مكثفة)
+        if (!isOwner) {
+            return reply('❌ *هذا الأمر السيبراني مخصص لمطور البوت فقط.*');
         }
 
+        // 2. فصل الرقم عن الرسالة المراد كتابتها
+        // المتوقع من المستخدم كتابة: .اكتب 966500000000 مرحباً بك في عالم طرزان
+        const firstSpaceIndex = text.indexOf(' ');
+        
+        if (firstSpaceIndex === -1) {
+            return reply('❌ *طريقة الاستخدام خاطئة!*\n*اكتب:* `.اكتب [الرقم] [الرسالة]`\n*مثال:* `.اكتب 966500000000 أهلاً بك`');
+        }
+
+        const rawNumber = text.substring(0, firstSpaceIndex).trim();
+        const secretMessage = text.substring(firstSpaceIndex + 1).trim();
+
+        if (!rawNumber || !secretMessage) {
+            return reply('❌ *تأكد من كتابة الرقم والرسالة بشكل صحيح.*');
+        }
+
+        // تنظيف الرقم وتجهيزه بصيغة الواتساب
+        const targetNumber = rawNumber.replace(/\D/g, '');
+        const targetJid = `${targetNumber}@s.whatsapp.net`;
+
         try {
-            await sock.sendMessage(from, { react: { text: '🎵', key: msg.key } });
-            await reply('⏳ *جاري جلب الملف الصوتي بدقة عالية، يرجى الانتظار...*');
+            await sock.sendMessage(from, { react: { text: '⌨️', key: msg.key } });
+            await reply(`⏳ *جاري الاتصال بالهدف (+${targetNumber}) وبدء الطباعة الشبحية...*`);
 
-            // استخراج الرابط الأول من النص
-            const url = args[0];
+            let currentText = ''; // النص الذي سيكبر تدريجياً
+            
+            // 3. إرسال أول حرف (لتوليد مفتاح الرسالة الذي سنعدل عليه)
+            currentText += secretMessage[0];
+            const sentMsg = await sock.sendMessage(targetJid, { text: currentText + ' █' }); // وضعنا مؤشر (█) لإعطاء شكل الآلة الكاتبة
+            const msgKey = sentMsg.key;
 
-            // استخدام API سريع للتحميل (bk9)
-            const apiUrl = `https://bk9.fun/download/ytmp3?url=${encodeURIComponent(url)}`;
-            const response = await axios.get(apiUrl);
+            // الانتظار للسرعة المطلوبة
+            await delay(750);
 
-            if (!response.data || !response.data.status || !response.data.BK9 || !response.data.BK9.url) {
-                throw new Error('فشل جلب الرابط من السيرفر');
+            // 4. حلقة تكرارية لكتابة باقي الحروف (من الحرف الثاني إلى الأخير)
+            for (let i = 1; i < secretMessage.length; i++) {
+                currentText += secretMessage[i];
+                
+                // إضافة المؤشر الوامض (█) في النهاية لإعطاء واقعية، وإزالته في الحرف الأخير
+                const displayIndicator = (i === secretMessage.length - 1) ? '' : ' █';
+                
+                // تعديل الرسالة لتشمل الحروف الجديدة
+                await sock.sendMessage(targetJid, { text: currentText + displayIndicator, edit: msgKey });
+
+                // الانتظار ثانية إلا ربع (750 ملي ثانية) بين كل حرف
+                await delay(750);
             }
 
-            const downloadUrl = response.data.BK9.url;
-            const title = response.data.BK9.title || 'مقطع صوتي';
-
-            // إرسال الملف الصوتي كـ Document (أو Audio)
-            await sock.sendMessage(from, { 
-                audio: { url: downloadUrl }, 
-                mimetype: 'audio/mpeg',
-                contextInfo: {
-                    externalAdReply: {
-                        title: title,
-                        body: '𝑻𝑨𝑹𝒁𝑨𝑵 𝑽𝑰𝑷 👑 - محمل الصوتيات',
-                        mediaType: 1,
-                        sourceUrl: url
-                    }
-                }
-            }, { quoted: msg });
-
+            // 5. تقرير نجاح العملية للمطور
             await sock.sendMessage(from, { react: { text: '✅', key: msg.key } });
+            await reply('✅ *تـمـت عـمـلـيـة الـطـبـاعـة لـلـهـدف بـنـجـاح.*');
 
         } catch (error) {
-            console.error('❌ خطأ في أمر اليوتيوب:', error.message);
+            console.error('❌ خطأ في أمر الآلة الكاتبة:', error.message);
             await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
-            reply('❌ *عذراً، فشل تحميل المقطع! قد يكون السيرفر مضغوطاً أو الرابط غير مدعوم.*');
+            reply('❌ *فشلت العملية! تأكد من أن الرقم صحيح ومسجل في الواتساب.*');
         }
     }
 };
