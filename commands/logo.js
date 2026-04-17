@@ -3,15 +3,12 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
 module.exports = {
     name: 'type',
     aliases: ['اكتب', 'شبح', 'طباعة'],
-    execute: async ({ sock, msg, text, reply, from, isOwner }) => {
+    execute: async ({ sock, msg, text, reply, from }) => {
         
-        // 1. التحقق من الصلاحيات (يُفضل للمطور فقط لأنها عملية مكثفة)
-        if (!isOwner) {
-            return reply('❌ *هذا الأمر السيبراني مخصص لمطور البوت فقط.*');
-        }
+        // تم إزالة شرط المطور، الأمر الآن متاح للجميع!
 
-        // 2. فصل الرقم عن الرسالة المراد كتابتها
-        // المتوقع من المستخدم كتابة: .اكتب 966500000000 مرحباً بك في عالم طرزان
+        // فصل الرقم عن الرسالة المراد كتابتها
+        // المتوقع: .اكتب 966500000000 الرسالة
         const firstSpaceIndex = text.indexOf(' ');
         
         if (firstSpaceIndex === -1) {
@@ -25,7 +22,7 @@ module.exports = {
             return reply('❌ *تأكد من كتابة الرقم والرسالة بشكل صحيح.*');
         }
 
-        // تنظيف الرقم وتجهيزه بصيغة الواتساب
+        // تنظيف الرقم وتجهيزه
         const targetNumber = rawNumber.replace(/\D/g, '');
         const targetJid = `${targetNumber}@s.whatsapp.net`;
 
@@ -33,31 +30,27 @@ module.exports = {
             await sock.sendMessage(from, { react: { text: '⌨️', key: msg.key } });
             await reply(`⏳ *جاري الاتصال بالهدف (+${targetNumber}) وبدء الطباعة الشبحية...*`);
 
-            let currentText = ''; // النص الذي سيكبر تدريجياً
+            let currentText = ''; 
             
-            // 3. إرسال أول حرف (لتوليد مفتاح الرسالة الذي سنعدل عليه)
+            // إرسال أول حرف للرقم المستهدف
             currentText += secretMessage[0];
-            const sentMsg = await sock.sendMessage(targetJid, { text: currentText + ' █' }); // وضعنا مؤشر (█) لإعطاء شكل الآلة الكاتبة
+            const sentMsg = await sock.sendMessage(targetJid, { text: currentText + ' █' }); 
             const msgKey = sentMsg.key;
 
-            // الانتظار للسرعة المطلوبة
             await delay(750);
 
-            // 4. حلقة تكرارية لكتابة باقي الحروف (من الحرف الثاني إلى الأخير)
+            // طباعة باقي الحروف للرقم المستهدف
             for (let i = 1; i < secretMessage.length; i++) {
                 currentText += secretMessage[i];
                 
-                // إضافة المؤشر الوامض (█) في النهاية لإعطاء واقعية، وإزالته في الحرف الأخير
                 const displayIndicator = (i === secretMessage.length - 1) ? '' : ' █';
                 
-                // تعديل الرسالة لتشمل الحروف الجديدة
                 await sock.sendMessage(targetJid, { text: currentText + displayIndicator, edit: msgKey });
 
-                // الانتظار ثانية إلا ربع (750 ملي ثانية) بين كل حرف
                 await delay(750);
             }
 
-            // 5. تقرير نجاح العملية للمطور
+            // تقرير النجاح
             await sock.sendMessage(from, { react: { text: '✅', key: msg.key } });
             await reply('✅ *تـمـت عـمـلـيـة الـطـبـاعـة لـلـهـدف بـنـجـاح.*');
 
