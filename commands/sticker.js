@@ -1,44 +1,46 @@
 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-const { Sticker, StickerTypes } = require('wa-sticker-formatter');
+const { Sticker, createSticker, StickerTypes } = require('wa-sticker-formatter');
 
 module.exports = {
     name: 'sticker',
-    aliases: ['s', 'ملصق', 'ستيكر'],
+    aliases: ['s', 'ستيكر', 'ملصق'],
     execute: async ({ sock, msg, reply, from }) => {
-        // البحث عن رسالة الصورة (سواء تم إرسالها مع الأمر أو الرد عليها)
+        
+        // التحقق مما إذا كانت الرسالة الحالية تحتوي على ميديا، أو إذا تم الرد على رسالة بها ميديا
+        const isMedia = msg.message?.imageMessage || msg.message?.videoMessage;
         const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-        const imgMsg = quotedMsg?.imageMessage || msg.message?.imageMessage;
+        const isQuotedMedia = quotedMsg?.imageMessage || quotedMsg?.videoMessage;
 
-        if (!imgMsg) {
-            await sock.sendMessage(from, { react: { text: '⚠️', key: msg.key } });
-            return reply('❌ يرجى إرسال صورة أو الرد على صورة مع كتابة الأمر.');
+        if (!isMedia && !isQuotedMedia) {
+            return reply('❌ *يرجى إرسال صورة أو فيديو مع الأمر، أو الرد على صورة/فيديو بالأمر.*');
         }
 
         try {
-            // سحب الصورة
-            const stream = await downloadMediaMessage(
-                quotedMsg ? { key: msg.message.extendedTextMessage.contextInfo, message: quotedMsg } : msg, 
-                'buffer', {}, { logger: console }
-            );
+            await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } });
 
-            // تحويلها لملصق فخم
-            const sticker = new Sticker(stream, { 
-                pack: 'TARZAN VIP 👑', 
-                author: 'طرزان الواقدي', 
-                type: StickerTypes.FULL, 
-                quality: 100 
+            // تحديد الرسالة التي سيتم تحميل الميديا منها
+            const messageToDownload = isMedia ? msg : { message: quotedMsg };
+            const buffer = await downloadMediaMessage(messageToDownload, 'buffer', {}, { logger: console });
+
+            // تحويل الميديا إلى ملصق باستخدام حزمة wa-sticker-formatter
+            const sticker = new Sticker(buffer, {
+                pack: 'Tarzan VIP 👑', // اسم الحزمة
+                author: 'طرزان بوت', // اسم الصانع
+                type: StickerTypes.FULL, // نوع الملصق (كامل)
+                quality: 50 // جودة الملصق
             });
 
+            await sticker.build();
+            const stickerBuffer = await sticker.get();
+
             // إرسال الملصق
-            await sock.sendMessage(from, { sticker: await sticker.build() }, { quoted: msg });
-            
-            // تفاعل النجاح
+            await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
             await sock.sendMessage(from, { react: { text: '✅', key: msg.key } });
-            
+
         } catch (error) {
-            console.error(error);
+            console.error('❌ خطأ في صانع الملصقات:', error);
             await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
-            reply('❌ فشل تحويل الصورة لملصق.');
+            reply('❌ *حدث خطأ أثناء صنع الملصق. قد يكون حجم الفيديو كبيراً جداً.*');
         }
     }
 };
