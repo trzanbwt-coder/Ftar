@@ -1,60 +1,47 @@
-const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 const axios = require('axios');
-const FormData = require('form-data');
 
 module.exports = {
-    name: 'rmbg',
-    aliases: ['عزل', 'تفريغ', 'قص'],
-    execute: async ({ sock, msg, reply, from }) => {
+    name: 'quote',
+    aliases: ['اقتباس', 'مقولة', 'مزيف'],
+    execute: async ({ sock, msg, text, reply, from, pushName, sender }) => {
         
-        // التحقق من وجود صورة (سواء مرفقة أو تم الرد عليها)
-        const isImage = msg.message?.imageMessage;
-        const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-        const isQuotedImage = quotedMsg?.imageMessage;
-
-        if (!isImage && !isQuotedImage) {
-            return reply('❌ *يرجى إرسال صورة مع الأمر، أو الرد على صورة بكلمة .عزل*');
+        if (!text) {
+            return reply('❌ *يرجى كتابة المقولة أو النص.*\n*مثال:* `.اقتباس الحياة جميلة يا صديقي`');
         }
 
         try {
-            await sock.sendMessage(from, { react: { text: '✂️', key: msg.key } });
-            await reply('⏳ *جاري تفريغ الصورة بدقة عالية، يرجى الانتظار قليلاً...*');
+            await sock.sendMessage(from, { react: { text: '🖋️', key: msg.key } });
 
-            // 1. تحميل الصورة من الواتساب
-            const messageToDownload = isImage ? msg : { message: quotedMsg };
-            const buffer = await downloadMediaMessage(messageToDownload, 'buffer', {}, { logger: console });
-
-            // 2. رفع الصورة مؤقتاً لسيرفر Catbox لكي يقرأها الذكاء الاصطناعي
-            const form = new FormData();
-            form.append('reqtype', 'fileupload');
-            form.append('fileToUpload', buffer, 'image.jpg');
-
-            const uploadRes = await axios.post('https://catbox.moe/user/api.php', form, {
-                headers: form.getHeaders()
-            });
-            const imageUrl = uploadRes.data;
-
-            // 3. رابط سيرفر العزل
-            const removeBgApi = `https://api.ryzendesu.vip/api/image/remove-bg?url=${encodeURIComponent(imageUrl)}`;
+            const userName = pushName || 'مجهول';
             
-            // 4. [الإصلاح الجذري] تحميل الصورة المفرغة كـ Buffer لمنع تلفها في الواتساب
-            const bgResponse = await axios.get(removeBgApi, { responseType: 'arraybuffer' });
-            const finalImageBuffer = Buffer.from(bgResponse.data, 'binary');
+            // محاولة جلب الصورة الشخصية للمستخدم (إذا لم يضع صورة، نستخدم صورة افتراضية)
+            let profilePicUrl;
+            try {
+                profilePicUrl = await sock.profilePictureUrl(sender, 'image');
+            } catch (err) {
+                profilePicUrl = 'https://i.ibb.co/3Fh9Q6M/blank-profile-picture-973460-1280.png'; // صورة شخصية فارغة
+            }
 
-            // 5. إرسال النتيجة كـ "ملف" (Document) للحفاظ على الخلفية الشفافة والدقة العالية
+            // استخدام API قوي لصنع الاقتباس (يعتمد على تصميم جميل)
+            // نمرر النص واسم المستخدم وصورته
+            const apiUrl = `https://api.popcat.xyz/quote?font=Cairo&text=${encodeURIComponent(text)}&name=${encodeURIComponent(userName)}&avatar=${encodeURIComponent(profilePicUrl)}`;
+
+            // تحميل الصورة كـ Buffer لضمان الاستقرار
+            const response = await axios.get(apiUrl, { responseType: 'arraybuffer' });
+            const imageBuffer = Buffer.from(response.data, 'binary');
+
+            // إرسال صورة الاقتباس
             await sock.sendMessage(from, { 
-                document: finalImageBuffer, 
-                mimetype: 'image/png',
-                fileName: 'Tarzan_RemoveBG.png', // اسم الملف
-                caption: '✂️ *تم تفريغ الصورة بنجاح!*\n💡 *ملاحظة:* تم إرسالها كملف للحفاظ على دقتها العالية وخلفيتها الشفافة.\n*— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑽𝑰𝑷 👑*'
+                image: imageBuffer, 
+                caption: '*— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑽𝑰𝑷 👑*'
             }, { quoted: msg });
 
             await sock.sendMessage(from, { react: { text: '✅', key: msg.key } });
 
         } catch (error) {
-            console.error('❌ خطأ في أمر العزل:', error.message);
+            console.error('❌ خطأ في صانع الاقتباسات:', error.message);
             await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
-            reply('❌ *فشل تفريغ الصورة! قد يكون السيرفر عليه ضغط، أو أن الصورة لا تحتوي على عنصر واضح لعزله.*');
+            reply('❌ *حدث خطأ أثناء تصميم الاقتباس، يرجى المحاولة لاحقاً.*');
         }
     }
 };
