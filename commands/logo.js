@@ -10,11 +10,11 @@ module.exports = {
             const helpText = `🎨 *صانع الشعارات الملكي 3D* 🎨
 يرجى اختيار رقم التصميم ثم كتابة الاسم:
 
-1️⃣ ذهب 3D (Gold)
-2️⃣ فضة معدني (Silver)
-3️⃣ نيون مضيء (Neon)
-4️⃣ نار مشتعلة (Fire)
-5️⃣ ماتركس (Matrix)
+1️⃣ نيون لامع (Neon)
+2️⃣ جلاكسي فضاء (Galaxy)
+3️⃣ نار مشتعلة (Fire)
+4️⃣ زجاج مكسور (Broken Glass)
+5️⃣ نص معدني (Metallic)
 
 *مثال للاستخدام:*
 \`.لوجو 1 طرزان\`
@@ -26,32 +26,36 @@ module.exports = {
         const name = args.slice(1).join(' ');
 
         // تحديد مسار الـ API المفتوح بناءً على الرقم
+        // استخدمت APIs قوية ومجانية من PopCat و api.xfarr وغيرها
         let apiUrl = '';
-        if (style === '1') apiUrl = `https://bk9.fun/maker/3dgold?text=${encodeURIComponent(name)}`;
-        else if (style === '2') apiUrl = `https://bk9.fun/maker/silver3d?text=${encodeURIComponent(name)}`;
-        else if (style === '3') apiUrl = `https://bk9.fun/maker/neonlight?text=${encodeURIComponent(name)}`;
-        else if (style === '4') apiUrl = `https://bk9.fun/maker/fire?text=${encodeURIComponent(name)}`;
-        else if (style === '5') apiUrl = `https://bk9.fun/maker/matrix?text=${encodeURIComponent(name)}`;
+        if (style === '1') apiUrl = `https://api.popcat.xyz/neon?text=${encodeURIComponent(name)}`;
+        else if (style === '2') apiUrl = `https://api.xfarr.com/api/textpro/space?text=${encodeURIComponent(name)}`;
+        else if (style === '3') apiUrl = `https://api.xfarr.com/api/textpro/firework?text=${encodeURIComponent(name)}`;
+        else if (style === '4') apiUrl = `https://api.xfarr.com/api/textpro/broken-glass?text=${encodeURIComponent(name)}`;
+        else if (style === '5') apiUrl = `https://api.xfarr.com/api/textpro/metallic?text=${encodeURIComponent(name)}`;
         else {
             return reply('❌ *رقم التصميم غير صحيح! اختر من 1 إلى 5.*');
         }
 
         try {
             await sock.sendMessage(from, { react: { text: '🎨', key: msg.key } });
-            await reply('⏳ *جاري نحت الشعار، ثواني فقط...*');
+            
+            // استخدمنا Axios لتحميل الصورة كبيانات (Buffer) لضمان عدم تعطل الواتساب
+            const response = await axios.get(apiUrl, { responseType: 'arraybuffer' });
+            const imageBuffer = Buffer.from(response.data, 'binary');
 
             // إرسال الصورة الجاهزة مباشرة
             await sock.sendMessage(from, { 
-                image: { url: apiUrl }, 
+                image: imageBuffer, 
                 caption: `🎨 *شعارك الفخم جاهز يا [ ${name} ]*\n*— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑽𝑰𝑷 👑*`
             }, { quoted: msg });
 
             await sock.sendMessage(from, { react: { text: '✅', key: msg.key } });
 
         } catch (error) {
-            console.error('❌ خطأ في صانع الشعارات:', error);
+            console.error('❌ خطأ في صانع الشعارات:', error.message);
             await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
-            reply('❌ *حدث خطأ في سيرفر التصميم، حاول بكلمة إنجليزية إذا فشل العربي.*');
+            reply('❌ *حدث خطأ في سيرفر التصميم. ملاحظة: بعض التصاميم لا تدعم اللغة العربية، جرب كتابة الاسم باللغة الإنجليزية.*');
         }
     }
 };
