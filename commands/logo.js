@@ -5,8 +5,6 @@ module.exports = {
     aliases: ['اكتب', 'شبح', 'طباعة'],
     execute: async ({ sock, msg, text, reply, from }) => {
         
-        // تم إزالة شرط المطور، الأمر الآن متاح للجميع!
-
         // فصل الرقم عن الرسالة المراد كتابتها
         // المتوقع: .اكتب 966500000000 الرسالة
         const firstSpaceIndex = text.indexOf(' ');
@@ -22,37 +20,41 @@ module.exports = {
             return reply('❌ *تأكد من كتابة الرقم والرسالة بشكل صحيح.*');
         }
 
-        // تنظيف الرقم وتجهيزه
+        // تنظيف الرقم وتجهيزه بصيغة الواتساب
         const targetNumber = rawNumber.replace(/\D/g, '');
         const targetJid = `${targetNumber}@s.whatsapp.net`;
 
         try {
             await sock.sendMessage(from, { react: { text: '⌨️', key: msg.key } });
-            await reply(`⏳ *جاري الاتصال بالهدف (+${targetNumber}) وبدء الطباعة الشبحية...*`);
+            await reply(`⏳ *جاري الاتصال بالهدف (+${targetNumber}) وبدء الطباعة الصاروخية...*`);
 
             let currentText = ''; 
             
-            // إرسال أول حرف للرقم المستهدف
+            // إرسال أول حرف للرقم المستهدف مع مؤشر الكتابة
             currentText += secretMessage[0];
             const sentMsg = await sock.sendMessage(targetJid, { text: currentText + ' █' }); 
             const msgKey = sentMsg.key;
 
-            await delay(750);
+            // 🚀 تم التعديل إلى 350 ملي ثانية
+            await delay(350);
 
             // طباعة باقي الحروف للرقم المستهدف
             for (let i = 1; i < secretMessage.length; i++) {
                 currentText += secretMessage[i];
                 
+                // إظهار المؤشر (█) وإخفائه عند الحرف الأخير
                 const displayIndicator = (i === secretMessage.length - 1) ? '' : ' █';
                 
+                // تعديل الرسالة
                 await sock.sendMessage(targetJid, { text: currentText + displayIndicator, edit: msgKey });
 
-                await delay(750);
+                // 🚀 تم التعديل إلى 350 ملي ثانية بين كل حرف
+                await delay(350);
             }
 
             // تقرير النجاح
             await sock.sendMessage(from, { react: { text: '✅', key: msg.key } });
-            await reply('✅ *تـمـت عـمـلـيـة الـطـبـاعـة لـلـهـدف بـنـجـاح.*');
+            await reply('✅ *تـمـت عـمـلـيـة الـطـبـاعـة لـلـهـدف بـنـجـاح بـسـرعـة صـاروخـيـة.*');
 
         } catch (error) {
             console.error('❌ خطأ في أمر الآلة الكاتبة:', error.message);
