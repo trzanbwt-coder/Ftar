@@ -1,7 +1,5 @@
 const yts = require('yt-search');
-const ytdl = require('@distube/ytdl-core');
-const fs = require('fs');
-const path = require('path');
+const axios = require('axios');
 
 module.exports = {
     name: 'video',
@@ -16,59 +14,50 @@ module.exports = {
         try {
             // تفاعل يدل على بدء البحث
             await sock.sendMessage(from, { react: { text: '🔍', key: msg.key } });
-            await reply(`⏳ *جـاري الـبـحـث عـن [ ${text} ] فـي يـوتـيـوب...*`);
+            await reply(`⏳ *جـاري الـبـحـث والـتـخـطـي الأكـاديـمـي لـحـمـايـة يـوتـيـوب...*`);
 
-            // 1. البحث في يوتيوب
+            // 1. البحث في يوتيوب للحصول على الرابط
             const searchResults = await yts(text);
-            const video = searchResults.videos[0]; // نأخذ أول نتيجة دائمًا لأنها الأقرب للبحث
+            const video = searchResults.videos[0]; // نأخذ أول نتيجة
 
             if (!video) {
                 await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
                 return reply('❌ *عـذراً، لـم أعـثـر عـلـى أي فـيـديـو بـهـذا الاسـم.*');
             }
 
-            // 2. التحقق من مدة الفيديو (منع الفيديوهات الطويلة جداً لحماية السيرفر والواتساب)
-            // 900 ثانية = 15 دقيقة
-            if (video.seconds > 900) {
-                return reply('⚠️ *عـذراً! الـفـيـديـو طـويـل جـداً (أكـثـر مـن 15 دقـيـقـة). يـرجـى اخـتـيـار مـقـطـع أقـصـر.*');
+            // 2. التحقق من مدة الفيديو (منع الفيديوهات الطويلة جداً - 20 دقيقة كحد أقصى)
+            if (video.seconds > 1200) {
+                return reply('⚠️ *عـذراً! الـفـيـديـو طـويـل جـداً. يـرجـى اخـتـيـار مـقـطـع أقـصـر لـتـجـنـب ضـغـط الـواتـسـاب.*');
             }
 
             // تفاعل يدل على بدء التحميل
             await sock.sendMessage(from, { react: { text: '⬇️', key: msg.key } });
 
-            // 3. إعداد مسار مؤقت لحفظ الفيديو قبل إرساله
-            // نستخدم رقم عشوائي لمنع تداخل الملفات إذا طلب شخصان فيديو في نفس الوقت
-            const tempFileName = path.join(__dirname, `temp_video_${Date.now()}.mp4`);
+            // 3. استخدام API خارجي قوي لتخطي حماية يوتيوب وجلب رابط التحميل المباشر
+            const apiUrl = `https://api.davidcyriltech.my.id/download/ytmp4?url=${video.url}`;
+            
+            const response = await axios.get(apiUrl);
+            
+            if (!response.data || !response.data.success || !response.data.result || !response.data.result.download_url) {
+                throw new Error('API لم يرجع رابط التحميل');
+            }
 
-            // 4. تحميل الفيديو بأفضل جودة مدمجة (صوت + صورة)
-            const stream = ytdl(video.url, { filter: 'audioandvideo' });
-
-            // حفظ الفيديو في الملف المؤقت
-            const fileWriteStream = fs.createWriteStream(tempFileName);
-            stream.pipe(fileWriteStream);
-
-            // 5. انتظار انتهاء التحميل
-            await new Promise((resolve, reject) => {
-                fileWriteStream.on('finish', resolve);
-                fileWriteStream.on('error', reject);
-                stream.on('error', reject);
-            });
+            const downloadUrl = response.data.result.download_url;
 
             // إعداد رسالة الوصف الفخمة
             const videoCaption = `
-*• ───── ❨ 🎬 يـوتـيـوب ❩ ───── •*
+*• ───── ❨ 🎬 يـوتـيـوب VIP ❩ ───── •*
 
 📌 *الـعـنـوان:* ${video.title}
 ⏱️ *الـمـدة:* ${video.timestamp}
 👁️ *الـمـشـاهـدات:* ${video.views.toLocaleString()}
-📅 *الـنـشـر:* ${video.ago}
 
 *— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑽𝑰𝑷 👑*
 `.trim();
 
-            // 6. إرسال الفيديو للمستخدم
+            // 4. إرسال الفيديو للمستخدم مباشرة من الرابط (دون الحاجة لتخزينه في السيرفر)
             await sock.sendMessage(from, { 
-                video: { url: tempFileName }, 
+                video: { url: downloadUrl }, 
                 caption: videoCaption,
                 mimetype: 'video/mp4'
             }, { quoted: msg });
@@ -76,15 +65,10 @@ module.exports = {
             // تفاعل النجاح
             await sock.sendMessage(from, { react: { text: '✅', key: msg.key } });
 
-            // 7. حذف الملف المؤقت من السيرفر لتوفير المساحة
-            if (fs.existsSync(tempFileName)) {
-                fs.unlinkSync(tempFileName);
-            }
-
         } catch (error) {
-            console.error('❌ خطأ في تحميل يوتيوب:', error);
+            console.error('❌ خطأ في تحميل يوتيوب المطور:', error.message || error);
             await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
-            reply('❌ *حـدث خـطـأ أثـنـاء الـتـحـمـيـل. قـد يـكـون الـفـيـديـو مـحـمـيـاً بـحـقـوق أو أنـه مـقـيـد بـالـعـمـر.*');
+            reply('❌ *حـدث خـطـأ عـنـيـد فـي الـسـيـرفـر. حـاول مـع فـيـديـو آخـر بـعـد قـلـيـل.*');
         }
     }
 };
