@@ -4,20 +4,18 @@ const axios = require('axios');
 const activeChats = new Map();
 
 // 🔑 مفتاح الـ API الرسمي الخاص بك (OpenAI)
-// قمت بتعديل الحرف الأول ليكون sk- (حرف صغير) لأن سيرفرات OpenAI تطلب ذلك
 const OPENAI_API_KEY = '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';
 
 module.exports = {
     name: 'auto_ai',
     aliases: ['تفعيل', 'الغا', 'تفعيل_الذكاء', 'الغاء_الذكاء'],
-    execute: async ({ sock, msg, text, reply, from, isOwner }) => {
+    execute: async ({ sock, msg, text, reply, from }) => {
         
         const command = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
         const isActivationCommand = command.includes('تفعيل');
 
-        // 1. نظام التفعيل والإلغاء (للمطور فقط)
+        // 1. نظام التفعيل والإلغاء (تمت إزالة شرط المطور، متاح للجميع الآن)
         if (command.startsWith('.تفعيل') || command.startsWith('.الغا')) {
-            if (!isOwner) return reply('❌ *هذا الأمر السيبراني مخصص للمطور فقط 👑.*');
 
             if (isActivationCommand) {
                 if (activeChats.has(from)) {
