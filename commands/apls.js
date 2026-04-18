@@ -1,222 +1,196 @@
 const { createCanvas } = require('canvas');
 
 module.exports = {
-    name: 'receipt3',
+    name: 'receipt',
     aliases: ['حواله', 'حوالة', 'سند', 'صرف'],
     execute: async ({ sock, msg, args, reply, from }) => {
         
-        // المتوقع: .حواله أحمد محمد | 771234567 | 150000
+        // المتوقع: .حواله طارق الواقدي | 7737996293 | 50000
         const input = args.join(' ');
         const details = input.split('|').map(item => item.trim());
 
         if (details.length < 3) {
-            return reply('❌ *طـريـقـة الاسـتـخـدام:* `.حواله الاسم | الهاتف | المبلغ`\n*مـثـال:* `.حواله طارق | 7737996293 | 50,000`');
+            return reply('❌ *طـريـقـة الاسـتـخـدام:* `.حواله الاسم | الهاتف | المبلغ`\n*مـثـال:* `.حواله طارق الواقدي | 7737996293 | 50000`');
         }
 
         const name = details[0];
         const phone = details[1];
-        // تنسيق المبلغ لإضافة الفواصل إذا كان رقماً
+        
+        // تنظيف المبلغ وإضافة الفواصل (مثال: 50000 تصبح 50,000 ريال)
         const rawAmount = details[2].replace(/[^\d]/g, '');
-        const amount = rawAmount ? parseInt(rawAmount).toLocaleString() + ' ر.ي' : details[2] + ' ر.ي';
+        const amount = rawAmount ? parseInt(rawAmount).toLocaleString('en-US') + ' ريال' : details[2] + ' ريال';
         
+        // ضبط التاريخ والوقت
         const dateObj = new Date();
-        const date = dateObj.toLocaleDateString('ar-EG');
-        const time = dateObj.toLocaleTimeString('ar-EG', { hour: '2-digit', minute:'2-digit' });
+        const date = dateObj.toLocaleDateString('en-GB'); // صيغة DD/MM/YYYY
         
-        // أرقام عشوائية واقعية
-        const receiptNumber = 'WQ-' + Math.floor(Math.random() * 900000 + 100000);
-        const transferNumber = 'TRN-' + Math.floor(Math.random() * 90000000 + 10000000); // رقم الحوالة
+        // توليد أرقام بنكية واقعية
+        const receiptNumber = 'WQ-' + Math.floor(Math.random() * 90000 + 10000);
+        const transferNumber = 'TRN-' + Math.floor(Math.random() * 90000000 + 10000000);
 
         try {
             await sock.sendMessage(from, { react: { text: '🖨️', key: msg.key } });
-            await reply('⏳ *جـاري اسـتـخـراج سـنـد الـحـوالـة مـن نـظـام الـواقـدي لـلـصـرافـة...*');
+            await reply('⏳ *جـاري طـبـاعـة الـسـنـد مـن الـنـظـام الـمـركـزي (بـدون أخـطـاء)...*');
 
-            // 1. إعداد أبعاد الكانفاس (السند - حجم مناسب للطباعة A5 تقريباً)
-            const width = 900;
-            const height = 650;
+            // 1. أبعاد دقيقة للسند (1000 عرض × 750 طول - يشبه ورقة A5)
+            const width = 1000;
+            const height = 750;
             const canvas = createCanvas(width, height);
             const ctx = canvas.getContext('2d');
 
-            // 2. الخلفية والورق الرسمي
-            // لون أبيض كريمي مريح للعين
-            ctx.fillStyle = '#fdfdfd';
+            // 2. الخلفية البيضاء النقية
+            ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, width, height);
 
-            // إضافة علامة مائية (Watermark) فخمة
-            ctx.fillStyle = 'rgba(230, 230, 230, 0.4)'; 
-            ctx.font = 'bold 120px Arial';
-            ctx.save();
-            ctx.translate(width / 2, height / 2 + 50);
-            ctx.rotate(-Math.PI / 4);
-            ctx.textAlign = 'center';
-            ctx.fillText('AL-WAQDI', 0, -40);
-            ctx.fillText('EXCHANGE', 0, 80);
-            ctx.restore();
-
-            // إطار خارجي أمني
-            ctx.strokeStyle = '#2c3e50';
-            ctx.lineWidth = 8;
-            ctx.strokeRect(15, 15, width - 30, height - 30);
-            ctx.lineWidth = 1;
-            ctx.strokeRect(26, 26, width - 52, height - 52);
-
-            // 3. الترويسة البنكية (الهيدر)
-            // شريط أزرق ملكي
-            ctx.fillStyle = '#1a3a5c'; 
-            ctx.fillRect(26, 26, width - 52, 110);
-
-            // نصوص الهيدر
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 45px Tahoma';
-            ctx.textAlign = 'center';
-            ctx.fillText('شــركــة الــواقــدي لـلـصـرافـة والـتـحـويـلات', width / 2, 75);
-
-            ctx.fillStyle = '#bdc3c7';
-            ctx.font = '22px Arial';
-            ctx.fillText('Al-Waqdi Exchange & Remittances Co. - Licensed No. 4059', width / 2, 115);
-
-            // 4. عنوان السند
-            ctx.fillStyle = '#c0392b';
-            ctx.font = 'bold 32px Tahoma';
-            ctx.fillText('ســنــد صــرف حــوالــة', width / 2, 185);
-
-            // 5. الجدول الاحترافي الدقيق
-            const startY = 220;
-            const rowH = 65;
+            // إطار خارجي مزدوج وفخم
+            ctx.strokeStyle = '#1a3a5c'; // أزرق كحلي
+            ctx.lineWidth = 6;
+            ctx.strokeRect(20, 20, width - 40, height - 40);
             ctx.lineWidth = 2;
-            ctx.strokeStyle = '#7f8c8d';
+            ctx.strokeRect(30, 30, width - 60, height - 60);
 
-            // دالة رسم الخلايا
-            const drawCell = (x, y, w, h, text, isHeader, isAmount = false) => {
-                // تلوين الخلفية
-                if (isHeader) {
-                    ctx.fillStyle = '#ecf0f1'; // رمادي فاتح للعناوين
-                } else if (isAmount) {
-                    ctx.fillStyle = '#e8f8f5'; // أخضر فاتح للمبلغ
-                } else {
-                    ctx.fillStyle = '#ffffff'; // أبيض للبيانات
-                }
+            // 3. الترويسة (Header)
+            ctx.fillStyle = '#1a3a5c'; 
+            ctx.fillRect(30, 30, width - 60, 110);
+
+            // نص الترويسة باللون الأبيض (بدون تشكيل لتجنب الخبيص)
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = 'bold 45px Arial';
+            ctx.fillText('شركة الواقدي للصرافة والتحويلات', width / 2, 70);
+
+            ctx.fillStyle = '#ecf0f1';
+            ctx.font = '22px Arial';
+            ctx.fillText('Al-Waqdi Exchange & Remittances - License No. 4059', width / 2, 115);
+
+            // 4. عنوان المستند
+            ctx.fillStyle = '#c0392b'; // لون أحمر
+            ctx.font = 'bold 35px Arial';
+            ctx.fillText('سند صرف حوالة مالية', width / 2, 180);
+
+            // 5. الجدول (هندسة دقيقة جداً بالبيكسل لمنع التداخل)
+            const tableY = 230;
+            const rowH = 60;
+            
+            // دالة لرسم خلايا الجدول باحترافية
+            const drawBox = (x, y, w, h, text, isTitle = false, isAmount = false) => {
+                // الخلفية
+                if (isTitle) ctx.fillStyle = '#f0f3f4'; // رمادي فاتح جداً للعنوان
+                else if (isAmount) ctx.fillStyle = '#e8f8f5'; // أخضر فاتح للمبلغ
+                else ctx.fillStyle = '#ffffff'; // أبيض للبيانات
+                
                 ctx.fillRect(x, y, w, h);
-                ctx.strokeRect(x, y, w, h); // رسم الإطار
+                
+                // الإطار
+                ctx.strokeStyle = '#7f8c8d';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, w, h);
 
-                // كتابة النص
-                if (isAmount && !isHeader) {
-                    ctx.fillStyle = '#27ae60'; // أخضر غامق لقمية المبلغ
+                // النص (توسيط مثالي)
+                if (isAmount && !isTitle) {
+                    ctx.fillStyle = '#27ae60'; // أخضر غامق
                     ctx.font = 'bold 28px Arial';
                 } else {
-                    ctx.fillStyle = '#2c3e50';
-                    ctx.font = isHeader ? 'bold 24px Tahoma' : '26px Arial';
+                    ctx.fillStyle = isTitle ? '#2c3e50' : '#000000';
+                    ctx.font = isTitle ? 'bold 24px Arial' : '24px Arial';
                 }
                 
-                // حساب موقع النص ليكون في المنتصف
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
                 ctx.fillText(text, x + (w / 2), y + (h / 2));
             };
 
-            // هندسة الجدول (العرض الكلي = 800، يبدأ من X=50)
-            const marginX = 50;
-            const colTitleW = 180; // عرض خلية العنوان
-            const colDataW = 220;  // عرض خلية البيانات
-
+            // بناء الجدول (العرض الكلي 900، يبدأ من 50)
             // الصف الأول (رقم السند والتاريخ)
-            drawCell(width - marginX - colTitleW, startY, colTitleW, rowH, 'رقـم الـسـنـد', true);
-            drawCell(width - marginX - colTitleW - colDataW, startY, colDataW, rowH, receiptNumber, false);
-            
-            drawCell(width - marginX - (colTitleW*2) - colDataW, startY, colTitleW, rowH, 'الـتـاريـخ', true);
-            drawCell(marginX, startY, colDataW, rowH, `${date}  ${time}`, false);
+            drawBox(750, tableY, 200, rowH, 'رقم السند', true);
+            drawBox(500, tableY, 250, rowH, receiptNumber, false);
+            drawBox(300, tableY, 200, rowH, 'التاريخ', true);
+            drawBox(50,  tableY, 250, rowH, date, false);
 
-            // الصف الثاني (رقم الحوالة - ميزة جديدة)
-            drawCell(width - marginX - colTitleW, startY + rowH, colTitleW, rowH, 'رقـم الـحـوالـة', true);
-            drawCell(marginX, startY + rowH, colDataW + colTitleW + colDataW, rowH, transferNumber, false);
+            // الصف الثاني (رقم الحوالة)
+            drawBox(750, tableY + rowH, 200, rowH, 'رقم الحوالة', true);
+            drawBox(50,  tableY + rowH, 700, rowH, transferNumber, false);
 
-            // الصف الثالث (الاسم)
-            drawCell(width - marginX - colTitleW, startY + (rowH*2), colTitleW, rowH, 'اسـم الـمـسـتـلـم', true);
-            drawCell(marginX, startY + (rowH*2), colDataW + colTitleW + colDataW, rowH, name, false);
+            // الصف الثالث (اسم المستفيد)
+            drawBox(750, tableY + (rowH*2), 200, rowH, 'اسم المستفيد', true);
+            drawBox(50,  tableY + (rowH*2), 700, rowH, name, false);
 
             // الصف الرابع (الهاتف والمبلغ)
-            drawCell(width - marginX - colTitleW, startY + (rowH*3), colTitleW, rowH, 'رقـم الـهـاتـف', true);
-            drawCell(width - marginX - colTitleW - colDataW, startY + (rowH*3), colDataW, rowH, phone, false);
-            
-            drawCell(width - marginX - (colTitleW*2) - colDataW, startY + (rowH*3), colTitleW, rowH, 'الـمـبـلـغ', true);
-            drawCell(marginX, startY + (rowH*3), colDataW, rowH, amount, false, true); // خلية المبلغ مظللة
+            drawBox(750, tableY + (rowH*3), 200, rowH, 'رقم الهاتف', true);
+            drawBox(500, tableY + (rowH*3), 250, rowH, phone, false);
+            drawBox(300, tableY + (rowH*3), 200, rowH, 'المبلغ', true);
+            drawBox(50,  tableY + (rowH*3), 250, rowH, amount, false, true); // خلية خضراء
 
 
-            // 6. التوقيعات
+            // 6. التوقيعات (أسفل الجدول)
             const signY = 530;
-            ctx.textBaseline = 'alphabetic'; // إعادة الضبط
-            ctx.fillStyle = '#34495e';
-            ctx.font = 'bold 22px Tahoma';
-            ctx.textAlign = 'center';
-            ctx.fillText('تـوقـيـع الـمـسـتـلـم', width - 200, signY);
-            ctx.fillText('الـمـديـر الـعـام', 200, signY);
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = 'bold 24px Arial';
+            ctx.fillText('توقيع المستلم', 800, signY);
+            ctx.fillText('توقيع المدير العام', 200, signY);
 
             // خطوط التوقيع
-            ctx.strokeStyle = '#95a5a6';
-            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#bdc3c7';
             ctx.setLineDash([5, 5]); // خط متقطع
-            ctx.beginPath(); ctx.moveTo(width - 300, signY + 50); ctx.lineTo(width - 100, signY + 50); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(100, signY + 50); ctx.lineTo(300, signY + 50); ctx.stroke();
-            ctx.setLineDash([]); // إعادة الخط المتصل
+            ctx.beginPath(); ctx.moveTo(700, signY + 40); ctx.lineTo(900, signY + 40); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(100, signY + 40); ctx.lineTo(300, signY + 40); ctx.stroke();
+            ctx.setLineDash([]); // إعادة الخط لمتصل
 
 
-            // 7. الختم الملكي الدائري (طرزان الواقدي)
+            // 7. الختم الدائري الفخم (طرزان الواقدي)
             ctx.save();
-            ctx.translate(width / 2, signY + 10); // موقع الختم
-            ctx.rotate(-0.15); // إمالة خفيفة
+            ctx.translate(width / 2, 590); // وضع الختم في منتصف الورقة من الأسفل
+            ctx.rotate(-0.15); // إمالة واقعية
             
-            const stampColor = 'rgba(192, 57, 43, 0.85)'; // أحمر واقعي شفاف قليلاً
+            const stampColor = 'rgba(192, 57, 43, 0.9)'; // أحمر حبر
             ctx.strokeStyle = stampColor;
             ctx.fillStyle = stampColor;
-            ctx.lineWidth = 4;
             
             // دوائر الختم
-            ctx.beginPath(); ctx.arc(0, 0, 85, 0, Math.PI * 2); ctx.stroke();
+            ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.arc(0, 0, 100, 0, Math.PI * 2); ctx.stroke();
             ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.arc(0, 0, 75, 0, Math.PI * 2); ctx.stroke();
-            ctx.beginPath(); ctx.arc(0, 0, 45, 0, Math.PI * 2); ctx.stroke();
+            ctx.beginPath(); ctx.arc(0, 0, 90, 0, Math.PI * 2); ctx.stroke();
+            ctx.beginPath(); ctx.arc(0, 0, 60, 0, Math.PI * 2); ctx.stroke();
 
-            // النص الدائري الملتف (طرزان الواقدي)
-            const stampText = "★ طــرزان الــواقــدي ★";
-            ctx.font = 'bold 20px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            
-            // رسم النص بشكل دائري في المساحة بين الدائرتين (45 و 75)
-            const radiusForText = 60;
-            const angleStep = Math.PI / (stampText.length / 1.5);
-            let currentAngle = -Math.PI; // البدء من اليسار
-            
-            for (let i = 0; i < stampText.length; i++) {
+            // رسم النص الإنجليزي الدائري في الإطار الخارجي (لأنه لا يتشوه)
+            const engText = " AL-WAQDI EXCHANGE - APPROVED -";
+            ctx.font = 'bold 16px Arial';
+            const radius = 75;
+            for (let i = 0; i < engText.length; i++) {
                 ctx.save();
-                ctx.rotate(currentAngle);
-                ctx.translate(0, -radiusForText);
-                ctx.rotate(Math.PI / 2); // تدوير الحرف ليكون عمودياً على المركز
-                ctx.fillText(stampText[i], 0, 0);
+                ctx.rotate(i * (Math.PI * 2 / engText.length));
+                ctx.fillText(engText[i], 0, -radius);
                 ctx.restore();
-                currentAngle += angleStep;
             }
 
-            // النص في مركز الختم
-            ctx.font = 'bold 18px Arial';
-            ctx.fillText('مُـعـتـمـد', 0, -10);
-            ctx.font = 'bold 20px Arial';
-            ctx.fillText('PAID', 0, 15);
+            // النص العربي (طرزان الواقدي) في مركز الختم بشكل أفقي عريض ومترابط
+            ctx.font = 'bold 26px Arial';
+            ctx.fillText('طرزان الواقدي', 0, 0);
             
-            ctx.restore();
+            // نصوص علوية وسفلية داخل الختم
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText('مُـعـتـمـد', 0, -30);
+            ctx.font = 'bold 20px Arial';
+            ctx.fillText('PAID', 0, 35);
+            
+            // نجوم تجميلية
+            ctx.font = '14px Arial';
+            ctx.fillText('★', -60, 0);
+            ctx.fillText('★', 60, 0);
 
-            // 8. تحويل وإرسال الصورة
+            ctx.restore(); // إنهاء رسم الختم
+
+            // 8. تجهيز الصورة وإرسالها
             const buffer = canvas.toBuffer('image/png');
 
             const captionMsg = `
-*• ───── ❨ 🏦 نـظـام صـرافـة طـرزان ❩ ───── •*
+*• ───── ❨ 🏦 نـظـام الـصـرافـة ❩ ───── •*
 
-✅ *تـم اعـتـمـاد الـحـوالـة وصـرفـهـا*
+✅ *تـم إصـدار الـسـنـد وتـوثـيـقـه بـنـجـاح*
 🔖 *رقـم الـحـوالـة:* ${transferNumber}
 👤 *الـمـسـتـلـم:* ${name}
-💰 *الـمـبـلـغ:* ${amount}
 
-*— الإدارة الـعـامـة | 𝑻𝑨𝑹𝒁𝑨𝑵 👑*
+*— الإدارة | 𝑻𝑨𝑹𝒁𝑨𝑵 👑*
 `.trim();
 
             await sock.sendMessage(from, { 
@@ -227,9 +201,9 @@ module.exports = {
             await sock.sendMessage(from, { react: { text: '✅', key: msg.key } });
 
         } catch (error) {
-            console.error('❌ خطأ في السند V3:', error);
+            console.error('❌ خطأ في السند النهائي:', error);
             await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
-            reply('❌ *حـدث خـطـأ فـي نـظـام الـطـبـاعـة الـمـركـزي.*');
+            reply('❌ *حـدث خـطـأ فـي الـنـظـام الـمـركـزي.*');
         }
     }
 };
