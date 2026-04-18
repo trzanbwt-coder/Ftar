@@ -1,81 +1,90 @@
-const axios = require('axios');
+const yts = require('yt-search');
+const ytdl = require('@distube/ytdl-core');
+const fs = require('fs');
+const path = require('path');
 
 module.exports = {
-    name: 'search',
-    aliases: ['بحث', 'دقدق', 'معلومة', 'ddg'],
+    name: 'video',
+    aliases: ['فيديو', 'يوتيوب', 'yt', 'ytv', 'شيلة', 'شيله'],
     execute: async ({ sock, msg, text, reply, from }) => {
         
         // التحقق من وجود كلمة للبحث
         if (!text) {
-            return reply('❌ *يـرجـى كـتـابـة مـا تـريـد الـبـحـث عـنـه.*\n*مـثـال:* `.بحث ثقب أسود` أو `.بحث جافا سكريبت`');
+            return reply('❌ *مـاذا تـريـد أن تـحـمـل؟*\n*مـثـال:* `.فيديو شيله حزينه` أو `.فيديو ملخص ريال مدريد`');
         }
 
         try {
-            // تفاعل يدل على أن البوت يبحث
+            // تفاعل يدل على بدء البحث
             await sock.sendMessage(from, { react: { text: '🔍', key: msg.key } });
+            await reply(`⏳ *جـاري الـبـحـث عـن [ ${text} ] فـي يـوتـيـوب...*`);
 
-            // إرسال الطلب إلى DuckDuckGo API
-            // أضفنا no_html=1 لإزالة الأكواد البرمجية من النص، و skip_disambig=1 لتخطي صفحات التوجيه
-            const apiUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(text)}&format=json&no_html=1&skip_disambig=1`;
-            
-            const response = await axios.get(apiUrl);
-            const data = response.data;
+            // 1. البحث في يوتيوب
+            const searchResults = await yts(text);
+            const video = searchResults.videos[0]; // نأخذ أول نتيجة دائمًا لأنها الأقرب للبحث
 
-            // استخراج البيانات من الـ JSON
-            const heading = data.Heading || text;
-            const abstract = data.AbstractText;
-            const source = data.AbstractSource || 'DuckDuckGo';
-            const url = data.AbstractURL || '';
-
-            // 1. إذا وجد إجابة مباشرة (خلاصة الموضوع)
-            if (abstract) {
-                const resultMsg = `
-*• ───── ❨ 🔍 نـتـيـجـة الـبـحـث ❩ ───── •*
-
-📌 *الـعـنـوان:* ${heading}
-
-📖 *الـخـلاصـة:*
-${abstract}
-
-🔗 *الـمـصـدر (${source}):*
-${url}
-
-*— مـحـرك 𝑻𝑨𝑹𝒁𝑨𝑵 الـسـري 👑*
-`.trim();
-
-                await reply(resultMsg);
-                await sock.sendMessage(from, { react: { text: '✅', key: msg.key } });
-
-            } 
-            // 2. إذا لم يجد خلاصة مباشرة، لكن وجد نتائج مقترحة (Related Topics)
-            else if (data.RelatedTopics && data.RelatedTopics.length > 0 && data.RelatedTopics[0].Text) {
-                const fallbackText = data.RelatedTopics[0].Text;
-                const fallbackUrl = data.RelatedTopics[0].FirstURL || '';
-                
-                const suggestedMsg = `
-*• ───── ❨ 🔍 نـتـيـجـة مـقـتـرحـة ❩ ───── •*
-
-📌 *مـوضـوع ذو صـلـة بـبـحـثـك:*
-${fallbackText}
-
-${fallbackUrl ? `🔗 *الـرابـط:*\n${fallbackUrl}\n` : ''}
-*— مـحـرك 𝑻𝑨𝑹𝒁𝑨𝑵 الـسـري 👑*
-`.trim();
-
-                await reply(suggestedMsg);
-                await sock.sendMessage(from, { react: { text: '☑️', key: msg.key } });
-
-            } 
-            // 3. إذا لم يجد أي شيء إطلاقاً
-            else {
+            if (!video) {
                 await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
-                reply('❌ *لـم أعـثـر عـلـى أي إجـابـات مـبـاشـرة حـول هـذا الـمـوضـوع.*');
+                return reply('❌ *عـذراً، لـم أعـثـر عـلـى أي فـيـديـو بـهـذا الاسـم.*');
+            }
+
+            // 2. التحقق من مدة الفيديو (منع الفيديوهات الطويلة جداً لحماية السيرفر والواتساب)
+            // 900 ثانية = 15 دقيقة
+            if (video.seconds > 900) {
+                return reply('⚠️ *عـذراً! الـفـيـديـو طـويـل جـداً (أكـثـر مـن 15 دقـيـقـة). يـرجـى اخـتـيـار مـقـطـع أقـصـر.*');
+            }
+
+            // تفاعل يدل على بدء التحميل
+            await sock.sendMessage(from, { react: { text: '⬇️', key: msg.key } });
+
+            // 3. إعداد مسار مؤقت لحفظ الفيديو قبل إرساله
+            // نستخدم رقم عشوائي لمنع تداخل الملفات إذا طلب شخصان فيديو في نفس الوقت
+            const tempFileName = path.join(__dirname, `temp_video_${Date.now()}.mp4`);
+
+            // 4. تحميل الفيديو بأفضل جودة مدمجة (صوت + صورة)
+            const stream = ytdl(video.url, { filter: 'audioandvideo' });
+
+            // حفظ الفيديو في الملف المؤقت
+            const fileWriteStream = fs.createWriteStream(tempFileName);
+            stream.pipe(fileWriteStream);
+
+            // 5. انتظار انتهاء التحميل
+            await new Promise((resolve, reject) => {
+                fileWriteStream.on('finish', resolve);
+                fileWriteStream.on('error', reject);
+                stream.on('error', reject);
+            });
+
+            // إعداد رسالة الوصف الفخمة
+            const videoCaption = `
+*• ───── ❨ 🎬 يـوتـيـوب ❩ ───── •*
+
+📌 *الـعـنـوان:* ${video.title}
+⏱️ *الـمـدة:* ${video.timestamp}
+👁️ *الـمـشـاهـدات:* ${video.views.toLocaleString()}
+📅 *الـنـشـر:* ${video.ago}
+
+*— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑽𝑰𝑷 👑*
+`.trim();
+
+            // 6. إرسال الفيديو للمستخدم
+            await sock.sendMessage(from, { 
+                video: { url: tempFileName }, 
+                caption: videoCaption,
+                mimetype: 'video/mp4'
+            }, { quoted: msg });
+
+            // تفاعل النجاح
+            await sock.sendMessage(from, { react: { text: '✅', key: msg.key } });
+
+            // 7. حذف الملف المؤقت من السيرفر لتوفير المساحة
+            if (fs.existsSync(tempFileName)) {
+                fs.unlinkSync(tempFileName);
             }
 
         } catch (error) {
-            console.error('❌ خطأ في محرك البحث:', error.message);
+            console.error('❌ خطأ في تحميل يوتيوب:', error);
             await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
-            reply('❌ *حـدث خـطـأ أثـنـاء الاتـصـال بـمـحـرك الـبـحـث (DuckDuckGo).*');
+            reply('❌ *حـدث خـطـأ أثـنـاء الـتـحـمـيـل. قـد يـكـون الـفـيـديـو مـحـمـيـاً بـحـقـوق أو أنـه مـقـيـد بـالـعـمـر.*');
         }
     }
 };
