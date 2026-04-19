@@ -1,193 +1,253 @@
-const { createCanvas, loadImage } = require('@napi-rs/canvas');
+const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
+const fs = require('fs');
+const path = require('path');
+const axios = require('axios');
 
 module.exports = {
-    name: 'stamp',
-    aliases: ['ختم', 'توقيع', 'ختمي', 'شعار'],
+    name: 'couple',
+    aliases: ['تصميم', 'حب', 'عشاق', 'اسماء', 'صمم'],
     execute: async ({ sock, msg, args, reply, from }) => {
         
-        if (args.length === 0) {
-            return reply('❌ *يـرجـى كـتـابـة الاسـم الـذي تـريـده عـلـى الـخـتـم.*\n*مـثـال:* `.ختم طرزان`');
+        if (args.length < 2) {
+            return reply(`
+❌ *يـرجـى كـتـابـة الاسـمـيـن.*\n
+*مـثـال لـصـورة واحـدة:* \`.تصميم طارق مريم\`
+*مـثـال لـعـدة صـور:* \`.تصميم طارق مريم 5\`
+            `.trim());
         }
 
-        const name = args.join(' ');
+        const name1 = args[0];
+        const name2 = args[1];
+        
+        // نظام العدد (يسمح من 1 إلى 5 صور كحد أقصى لمنع الضغط على السيرفر)
+        let count = 1;
+        if (args[2] && !isNaN(args[2])) {
+            count = parseInt(args[2]);
+            if (count > 5) count = 5; 
+            if (count < 1) count = 1;
+        }
+
+        // 1. مكتبة الخلفيات (صور حقيقية، فخمة، منوعة)
+        const premiumBackgrounds = [
+            'https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=1080', // قلوب نيون
+            'https://images.unsplash.com/photo-1518599904199-0ca897819ddb?q=80&w=1080', // ورود حمراء داكنة
+            'https://images.unsplash.com/photo-1494972308805-463bc619d34e?q=80&w=1080', // ورد ناعم
+            'https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?q=80&w=1080', // أضواء ليلية ومدينة
+            'https://images.unsplash.com/photo-1505909182942-e2f09aee3e89?q=80&w=1080', // سماء ونجوم
+            'https://images.unsplash.com/photo-1606214815144-8d488e0b6b80?q=80&w=1080', // ورود بيضاء فخمة
+            'https://images.unsplash.com/photo-1474552226712-ac0f0961a954?q=80&w=1080', // أضواء ذهبية
+            'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=1080', // طبيعة رومانسية وضباب
+            'https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=1080', // خواتم زفاف
+            'https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=80&w=1080', // خلفية خيالية وغروب
+            'https://images.unsplash.com/photo-1518895949257-76eb0f6bf3ee?q=80&w=1080', // غروب الشمس
+            'https://images.unsplash.com/photo-1532453288672-3a27e9be9efd?q=80&w=1080', // شموع رومانسية
+            'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=1080', // موسيقى داكنة
+            'https://images.unsplash.com/photo-1500628028294-607a3c7ed147?q=80&w=1080', // أزهار متوهجة
+            'https://images.unsplash.com/photo-1543610892-0b1f7e6d8ac1?q=80&w=1080', // قلب مضيء
+            'https://images.unsplash.com/photo-1520052205864-92d242b3a4e4?q=80&w=1080', // سماء فخمة
+            'https://images.unsplash.com/photo-1511895426328-dc8714191300?q=80&w=1080', // أضواء بوكيه ومطر
+            'https://images.unsplash.com/photo-1510074377623-8cf13fb86c08?q=80&w=1080', // ورود وردية
+            'https://images.unsplash.com/photo-1493690283958-32df2c86326e?q=80&w=1080', // لمسات داكنة
+            'https://images.unsplash.com/photo-1533038590840-1c56cb709798?q=80&w=1080', // خلفية زفاف
+            'https://images.unsplash.com/photo-1495954380655-01609180eda3?q=80&w=1080', // رومانسي دافئ
+            'https://images.unsplash.com/photo-1525625293386-3f8f99389edd?q=80&w=1080', // أضواء شتوية وثلج
+            'https://images.unsplash.com/photo-1507679622822-6b6a37882fb9?q=80&w=1080', // قلب لامع في الظلام
+            'https://images.unsplash.com/photo-1481016570479-9eab6349fde7?q=80&w=1080', // ألوان ليلية لمدينة
+            'https://images.unsplash.com/photo-1501162946741-4960f91ab1ec?q=80&w=1080', // غابة رومانسية
+            'https://images.unsplash.com/photo-1513624954087-cca71150f70c?q=80&w=1080', // أضواء خافتة
+            'https://images.unsplash.com/photo-1541818221617-66a7b7a15a81?q=80&w=1080', // كوب قهوة وورد
+            'https://images.unsplash.com/photo-1508610048659-a06b669e3321?q=80&w=1080', // شجرة حب
+            'https://images.unsplash.com/photo-1532054921136-12c8233f2a55?q=80&w=1080', // رسائل رومانسية وقهوة
+            'https://images.unsplash.com/photo-1496060169243-453fde45943b?q=80&w=1080', // ألوان خيالية ومحيط
+            'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?q=80&w=1080', // طبيعة فخمة
+            'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?q=80&w=1080'  // غابات داكنة
+        ];
+
+        // 2. مكتبة العبارات الفخمة (115 عبارة)
+        const quotes = [
+            "أنتِ الوجهة وأنتِ الطريق.", "في عيونك أرى وطني الذي لا يضيع.", "ولنا في بعضنا حياة، وفي عناقنا نجاة.",
+            "أنتِ النور الذي أضاء عتمة أيامي.", "يا أجمل أقداري، ويا أعظم انتصاراتي.", "أنتِ البداية التي لا نهاية لها في قلبي.",
+            "سأكتفي بكِ حلماً وواقعاً وحياة.", "أنتِ لستِ فقط حبيبتي، أنتِ روحي التي أتنفس بها.", "في ابتسامتكِ أجد السلام.",
+            "عناقكِ هو المكان الوحيد الذي أود البقاء فيه للأبد.", "كأنكِ خُلقتِ من ضلعي لتبقي بجانبي.",
+            "أحبكِ كأنكِ أمانتي الوحيدة في هذه الأرض.", "أنتِ عيدي وقبلة روحي.", "لو كان لي أن أختار، لاخترتكِ في كل مرة.",
+            "أنتِ النبض الذي يحيي قلبي الميت.", "في ملامحكِ أقرأ أجمل قصائدي.", "لا شيء يشبهكِ، ولا أحد يعوض مكانكِ.",
+            "سأبقى أحبكِ حتى يتوقف قلبي عن النبض.", "أنتِ الملاذ الآمن لروحي المتعبة.", "أنتِ السر الجميل الذي يختبئ في قلبي.",
+            "في عينيكِ أجد الكون بأكمله.", "أنتِ النجمة التي تضيء سماء حياتي.", "حبكِ هو القوة التي تدفعني للحياة.",
+            "أنتِ الابتسامة التي ترتسم على وجهي دون سبب.", "أنتِ الفرح الذي يغمر قلبي في كل لحظة.",
+            "أدمنا الله معاً للأبد، يا أجمل أشيائي.", "كل الأغاني الجميلة تذكرني بكِ.", "أنتِ الرواية التي أقرأها كل يوم ولا أمل منها.",
+            "أنتِ الدفء الذي يحيط بقلبي في ليالي الشتاء.", "أنتِ القطعة الناقصة التي اكتملت بها روحي.",
+            "أنتِ السعادة التي لطالما بحثت عنها.", "أنتِ العمر الذي أود أن أعيشه مرتين.", "أنتِ الحكاية التي لا أود أن تنتهي أبداً.",
+            "أنتِ الحب الذي لا يعرف حدوداً ولا قيوداً.", "أنتِ السماء التي تحلق فيها طموحاتي.", "أنتِ البحر الذي أغرق فيه دون خوف.",
+            "أنتِ المطر الذي يروي عطش قلبي.", "أنتِ الوردة التي لا تذبل في بستان حياتي.", "أنتِ النسمة العليلة التي تنعش روحي.",
+            "أنتِ القمر الذي ينير ظلمة ليالي.", "أنتِ الشمس التي تشرق لتضيء يومي.", "أنتِ كل شيء وأكثر مما تمنيت.",
+            "بكِ أكتفي عن العالمين.", "أنتِ عالمي الصغير الذي يغنيني عن الكون.", "يا سيدة قلبي وأميرة روحي.",
+            "بين ذراعيكِ أجد وطني المفقود.", "أنتِ طمأنينتي في عالم مليء بالفوضى.", "أحبكِ بحجم الكون وأكثر.",
+            "أنتِ قصيدتي التي لم تُكتب بعد.", "أنتِ لحني المفضل الذي أعزفه كل يوم.", "يا زهرة عمري وربيع أيامي.",
+            "أنتِ الأمان الذي أبحث عنه في عيون البشر.", "معكِ أجد نفسي وأنسى أحزاني.", "أنتِ أمنيتي التي تحققت.",
+            "يا نبض الوريد وسر الوجود.", "أنتِ وتيني الذي يضخ الحب في عروقي.", "أحبكِ اليوم وغداً وإلى الأبد.",
+            "أنتِ قدري الأجمل الذي ساقه الله لي.", "أنتِ جنتي على الأرض.", "يا أجمل عطايا الرب وأعظم نعمائه.",
+            "في قلبكِ وطني، وفي عينيكِ مسكني.", "أنتِ حلمي المحقق وواقعي الجميل.", "يا ضياء عيني ونور دربي.",
+            "أنتِ الروح التي تسكن جسدي.", "أحبكِ فوق الحب حباً، وفوق العشق عشقاً.", "أنتِ سر سعادتي ومصدر إلهامي.",
+            "يا غيمتي الماطرة بالحب والفرح.", "أنتِ نجمتي المضيئة في سماء العتمة.", "يا عطر حياتي وأريج أيامي.",
+            "أنتِ المأوى الذي ألجأ إليه من قسوة الأيام.", "بكِ أستظل من شمس الأحزان.", "أنتِ النعمة التي أشكر الله عليها كل يوم.",
+            "يا بهجة القلب وسرور الخاطر.", "أنتِ شمس الشتاء الدافئة.", "أنتِ قمر الليالي الصافية.",
+            "يا وردة الروح وريحانة القلب.", "أنتِ البسمة التي تمحو كل همومي.", "أحبكِ بلا حدود ولا نهايات.",
+            "أنتِ حكايتي الأجمل التي أرويها بفخر.", "يا أجمل تفاصيلي وأروع ذكرياتي.", "أنتِ نبض الخفوق وسر النبض.",
+            "يا دواء جرحي وبلسم أوجاعي.", "أنتِ بلسم روحي وشفاء قلبي.", "يا نور دربي ومصباح حياتي.",
+            "أنتِ شريكي في الحلم والواقع.", "أحبكِ بصدق لا تشوبه شائبة.", "أنتِ كل أشيائي الجميلة.",
+            "يا فرحة سنيني وأجمل أيامي.", "أنتِ حظي الحلو من هذه الدنيا.", "يا مسك الختام وأجمل البدايات.",
+            "أنتِ أملي الذي لا يخيب.", "يا شطر روحي ونصف قلبي.", "أنتِ النصف الآخر الذي يكملني.",
+            "يا توأم الروح ورفيقة الدرب.", "أنتِ ملاكي الحارس في هذه الحياة.", "أحبكِ بعمق البحار واتساع السماء.",
+            "أنتِ عشقي الأبدي الذي لا يموت.", "يا غايتي في هذه الدنيا.", "أنتِ محطتي الأخيرة التي أستقر فيها.",
+            "يا سحر العيون وفتنة الألباب.", "أنتِ شغفي الذي لا ينطفئ.", "يا أحلى أيامي وأجمل لياليّ.",
+            "أنتِ قمري الذي لا يغيب.", "أحبكِ كما أنتِ، بكل تفاصيلكِ.", "أنتِ دنيتي وما فيها.",
+            "يا زينة حياتي وتاج رأسي.", "أنتِ فرحتي التي لا توصف.", "يا أغلى البشر على قلبي.",
+            "أنتِ حبي الأبدي الذي سيخلده الزمان.", "في صوتكِ حياة، وفي همسكِ نجاة.", "أنتِ ملاذي الآمن من كل خوف.",
+            "يا قرة عيني وسلوى فؤادي.", "أنتِ كنزي الثمين الذي لا يقدر بثمن.", "أحبكِ أضعاف ما أبدي وأكثر مما تتخيلين.",
+            "لو أن للحب صوتاً لسمعتِ دقات قلبي تنادي باسمكِ.", "أنتِ الإجابة لكل دعواتي.", "معكِ، كل الأيام أعياد."
+        ];
 
         try {
-            await sock.sendMessage(from, { react: { text: '🔥', key: msg.key } });
-            await reply('⏳ *جـاري صـب الـمـعـدن وصـنـاعـة الـخـتـم الـمـلـكـي ثـلاثـي الأبـعـاد (3D)...*');
+            await sock.sendMessage(from, { react: { text: '🎨', key: msg.key } });
+            
+            if (count > 1) {
+                await reply(`⏳ *جـاري تـجـهـيـز [ ${count} ] صـور فـخـمـة واسـتـدعـاء الـعـبـارات الـمـلـكـيـة...*`);
+            } else {
+                await reply('⏳ *جـاري تـصـمـيـم الـلـوحـة الـرومـانـسـيـة...*');
+            }
 
-            const width = 1080;
-            const height = 1080;
-            const canvas = createCanvas(width, height);
-            const ctx = canvas.getContext('2d');
+            // تحميل خط القاهرة (Cairo) لضمان فخامة النص
+            const fontPath = path.join(__dirname, 'Cairo-Bold.ttf');
+            if (!fs.existsSync(fontPath)) {
+                const fontUrl = 'https://raw.githubusercontent.com/google/fonts/main/ofl/cairo/Cairo-Bold.ttf';
+                const response = await axios({ url: fontUrl, responseType: 'stream' });
+                const writer = fs.createWriteStream(fontPath);
+                response.data.pipe(writer);
+                await new Promise((resolve, reject) => {
+                    writer.on('finish', resolve);
+                    writer.on('error', reject);
+                });
+            }
+            GlobalFonts.registerFromPath(fontPath, 'Cairo');
 
-            const cx = width / 2;
-            const cy = height / 2;
-
-            // 1. خلفية جلدية داكنة جداً (لإبراز الذهب)
-            const bgGradient = ctx.createRadialGradient(cx, cy, 100, cx, cy, 800);
-            bgGradient.addColorStop(0, '#1a1a1a'); // رمادي داكن في المنتصف
-            bgGradient.addColorStop(1, '#050505'); // أسود حالك في الأطراف
-            ctx.fillStyle = bgGradient;
-            ctx.fillRect(0, 0, width, height);
-
-            // 2. تدرجات الذهب الخرافية (للمعدن)
-            // التدرج الأساسي لمعان الذهب
-            const goldGradient = ctx.createLinearGradient(100, 100, 980, 980);
-            goldGradient.addColorStop(0, '#BF953F');
-            goldGradient.addColorStop(0.25, '#FCF6BA');
-            goldGradient.addColorStop(0.5, '#b38728');
-            goldGradient.addColorStop(0.75, '#FBF5B7');
-            goldGradient.addColorStop(1, '#AA771C');
-
-            // تدرج معكوس لصناعة الحواف البارزة (Bevel Illusion)
-            const goldReverse = ctx.createLinearGradient(980, 980, 100, 100);
-            goldReverse.addColorStop(0, '#BF953F');
-            goldReverse.addColorStop(0.25, '#FCF6BA');
-            goldReverse.addColorStop(0.5, '#b38728');
-            goldReverse.addColorStop(0.75, '#FBF5B7');
-            goldReverse.addColorStop(1, '#AA771C');
-
-            // 3. رسم الظل العميق الساقط للختم (كأنه جسم ثقيل 3D)
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-            ctx.shadowBlur = 60;
-            ctx.shadowOffsetX = 15;
-            ctx.shadowOffsetY = 25;
-
-            // 4. قاعدة الختم (القرص الذهبي الأكبر)
-            ctx.beginPath();
-            ctx.arc(cx, cy, 400, 0, Math.PI * 2);
-            ctx.fillStyle = goldGradient;
-            ctx.fill();
-
-            // إلغاء الظل الخارجي لكي لا يؤثر على النقوش الداخلية
-            ctx.shadowColor = 'transparent';
-
-            // 5. حواف الختم الداخلية (محفورة وبارزة)
-            const drawRing = (radius, thickness, gradient, isEngraved) => {
-                ctx.beginPath();
-                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-                ctx.lineWidth = thickness;
-                ctx.strokeStyle = gradient;
+            // دالة لتوليد صورة واحدة
+            const generateImage = async () => {
                 
-                // إضافة ظل داخلي خفيف لصناعة العمق 3D
-                if (isEngraved) {
-                    ctx.shadowColor = 'rgba(0,0,0,0.6)';
-                    ctx.shadowBlur = 10;
-                    ctx.shadowOffsetX = 3;
-                    ctx.shadowOffsetY = 3;
-                } else {
-                    ctx.shadowColor = 'rgba(255,255,255,0.4)';
-                    ctx.shadowBlur = 10;
-                    ctx.shadowOffsetX = -2;
-                    ctx.shadowOffsetY = -2;
+                // اختيار خلفية وعبارة عشوائية
+                const randomBgUrl = premiumBackgrounds[Math.floor(Math.random() * premiumBackgrounds.length)];
+                const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+                
+                let bgImage;
+                try {
+                    bgImage = await loadImage(randomBgUrl);
+                } catch (e) {
+                    bgImage = await loadImage('https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=1080');
                 }
-                ctx.stroke();
-                ctx.shadowColor = 'transparent'; // إعادة الضبط
-            };
 
-            // رسم حلقات متعددة ليعطي شكل العملة أو الختم الملكي
-            drawRing(380, 15, goldReverse, true); // حلقة محفورة
-            drawRing(350, 4, goldGradient, false); // خط بارز رفيع
-            drawRing(230, 8, goldReverse, true); // حلقة محفورة داخلية
+                const width = 1080;
+                const height = 1080;
+                const canvas = createCanvas(width, height);
+                const ctx = canvas.getContext('2d');
 
-            // 6. نصوص وزخارف دائرية (باللغة الإنجليزية لضمان عدم تشوهها بالدوران)
-            // دالة لرسم النص الدائري
-            const drawCircularText = (text, radius, angleOffset) => {
-                ctx.font = 'bold 38px Arial';
-                ctx.fillStyle = '#6b4e0b'; // لون ذهبي داكن محفور
+                // رسم الصورة الخلفية مع الحفاظ على الأبعاد
+                const scale = Math.max(width / bgImage.width, height / bgImage.height);
+                const x = (width / 2) - (bgImage.width / 2) * scale;
+                const y = (height / 2) - (bgImage.height / 2) * scale;
+                ctx.drawImage(bgImage, x, y, bgImage.width * scale, bgImage.height * scale);
+
+                // وضعيات النص (أعلى، وسط، أسفل) للتنويع بين الصور
+                const positions = ['top', 'center', 'bottom'];
+                const textPos = positions[Math.floor(Math.random() * positions.length)];
+                
+                // فلتر التعتيم السينمائي (يتغير مكانه حسب وضعية النص لضمان الوضوح)
+                const gradient = ctx.createLinearGradient(0, 0, 0, height);
+                if (textPos === 'bottom') {
+                     gradient.addColorStop(0, 'rgba(0,0,0,0.1)');
+                     gradient.addColorStop(0.5, 'rgba(0,0,0,0.5)');
+                     gradient.addColorStop(1, 'rgba(0,0,0,0.95)'); 
+                } else if (textPos === 'top') {
+                     gradient.addColorStop(0, 'rgba(0,0,0,0.95)');
+                     gradient.addColorStop(0.5, 'rgba(0,0,0,0.5)');
+                     gradient.addColorStop(1, 'rgba(0,0,0,0.1)');
+                } else {
+                     gradient.addColorStop(0, 'rgba(0,0,0,0.3)');
+                     gradient.addColorStop(0.5, 'rgba(0,0,0,0.85)');
+                     gradient.addColorStop(1, 'rgba(0,0,0,0.3)');
+                }
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, width, height);
+
+                // كتابة الأسماء
+                const text = `${name1} ❤️ ${name2}`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 
-                // ظل النقش المحفور (Engraved Text 3D Effect)
-                ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
-                ctx.shadowBlur = 2;
-                ctx.shadowOffsetX = -1;
-                ctx.shadowOffsetY = -1;
+                // خط القاهرة
+                ctx.font = 'bold 95px "Cairo", sans-serif';
+                
+                // تأثير الظل 3D
+                ctx.shadowColor = '#000000';
+                ctx.shadowBlur = 25;
+                ctx.shadowOffsetX = 5;
+                ctx.shadowOffsetY = 5;
 
-                const step = (Math.PI * 2) / text.length;
-                for (let i = 0; i < text.length; i++) {
-                    ctx.save();
-                    ctx.translate(cx, cy);
-                    ctx.rotate(i * step + angleOffset);
-                    ctx.translate(0, -radius);
-                    ctx.fillText(text[i], 0, 0);
-                    // لون غامق للحفر
-                    ctx.shadowColor = 'rgba(0,0,0,0.8)';
-                    ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
-                    ctx.fillText(text[i], 0, 0);
-                    ctx.restore();
-                }
+                // تحديد إحداثية الـ Y للنص
+                let textY;
+                if (textPos === 'top') textY = 250;
+                else if (textPos === 'bottom') textY = height - 250;
+                else textY = height / 2 - 40;
+
+                // التدرج اللوني الذهبي
+                const textGradient = ctx.createLinearGradient(0, textY - 50, 0, textY + 50);
+                textGradient.addColorStop(0, '#ffffff'); 
+                textGradient.addColorStop(0.6, '#ffd700'); 
+                textGradient.addColorStop(1, '#b8860b'); 
+                
+                // رسم إطار أسود ثم تلوين الكلمة
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 6;
+                ctx.strokeText(text, width / 2, textY);
+                ctx.fillStyle = textGradient;
+                ctx.fillText(text, width / 2, textY);
+
+                // رسم العبارة الرومانسية
+                ctx.font = 'bold 38px "Cairo", sans-serif';
+                ctx.fillStyle = '#ffffff'; 
+                ctx.lineWidth = 3;
+                
+                ctx.strokeText(randomQuote, width / 2, textY + 120);
+                ctx.fillText(randomQuote, width / 2, textY + 120);
+
+                // حقوق البوت
                 ctx.shadowColor = 'transparent';
+                ctx.font = 'bold 22px "Cairo", sans-serif';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.fillText('DESIGNED BY 𝑻𝑨𝑹𝒁𝑨𝑵 👑', width / 2, height - 30);
+
+                return canvas.encode('png');
             };
 
-            // رسم النص الدائري (OFFICIAL VIP SEAL) مرتين لملئ الدائرة
-            drawCircularText(" ★ OFFICIAL VIP SEAL ★ APPROVED ", 290, 0);
-            
-            // 7. النجوم الزخرفية
-            ctx.font = '50px Arial';
-            ctx.fillStyle = '#6b4e0b';
-            ctx.fillText('★', cx - 140, cy);
-            ctx.fillText('★', cx + 140, cy);
+            // 5. حلقة التكرار (Loop) لإنشاء العدد المطلوب من الصور
+            const buffers = [];
+            for (let i = 0; i < count; i++) {
+                const buffer = await generateImage();
+                buffers.push(buffer);
+            }
 
-            // 8. السحر الحقيقي: رسم الاسم الثلاثي الأبعاد (3D Embossed Text) في المركز
-            // نقوم بطباعة النص 3 مرات بطبقات مختلفة
-            
-            ctx.font = 'bold 110px Tahoma, Arial Black, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-
-            // الطبقة 1: الظل الداكن (العمق) - تحت النص
-            ctx.fillStyle = '#3a270b'; // بني/أسود معدني
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-            ctx.shadowBlur = 15;
-            ctx.shadowOffsetX = 8;
-            ctx.shadowOffsetY = 12;
-            ctx.fillText(name, cx + 5, cy + 5);
-            ctx.fillText(name, cx + 4, cy + 4);
-            ctx.fillText(name, cx + 3, cy + 3);
-
-            // الطبقة 2: لمعة الضوء (الإضاءة العلوية) - فوق الظل
-            ctx.shadowColor = 'transparent';
-            ctx.fillStyle = '#ffffe0'; // أصفر فاتح جداً / أبيض
-            ctx.fillText(name, cx - 2, cy - 2);
-
-            // الطبقة 3: واجهة النص (المعدن الأساسي)
-            ctx.fillStyle = goldGradient;
-            ctx.fillText(name, cx, cy);
-
-            // كتابة صغيرة أسفل الاسم
-            ctx.font = 'bold 28px Arial';
-            
-            // تأثير 3D للكلمة الصغيرة
-            ctx.fillStyle = '#3a270b';
-            ctx.fillText('SIGNATURE', cx + 2, cy + 92);
-            ctx.fillStyle = goldGradient;
-            ctx.fillText('SIGNATURE', cx, cy + 90);
-
-
-            // 9. تصدير التحفة الفنية
-            const buffer = await canvas.encode('png');
-
-            const captionMsg = `
-*• ───── ❨ ⚜️ الـخـتـم الـمـلـكـي ❩ ───── •*
-
-👑 *الاسـم:* ${name}
-✨ *الـنـوع:* خـتـم ذهـبـي ثـلاثـي الأبـعـاد (3D)
-
-*— صـُنـع بـفـخـامـة بـواسـطـة 𝑻𝑨𝑹𝒁𝑨𝑵 𝑽𝑰𝑷 👑*
-`.trim();
-
-            await sock.sendMessage(from, { 
-                image: buffer, 
-                caption: captionMsg 
-            }, { quoted: msg });
+            // 6. إرسال الصور للجروب متتالية
+            for (let i = 0; i < buffers.length; i++) {
+                await sock.sendMessage(from, { 
+                    image: buffers[i],
+                    caption: `*• ───── ❨ 💍 إبـداع طـرزان ❩ ───── •*\n*📸 الـصـورة: ${i + 1} / ${count}*\n*— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑽𝑰𝑷 👑*`
+                });
+            }
 
             await sock.sendMessage(from, { react: { text: '✅', key: msg.key } });
 
         } catch (error) {
-            console.error('❌ خطأ في أمر الختم 3D:', error);
+            console.error('❌ خطأ في أمر تصميم الحب المتعدد:', error);
             await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
-            reply('❌ *حـدث خـطـأ أثـنـاء صـب الـمـعـدن وتـشـكـيـل الـخـتـم.*');
+            reply('❌ *حـدث خـطـأ أثـنـاء تـصـمـيـم الـصـور. يـرجـى الـمـحـاولـة لاحـقـاً.*');
         }
     }
 };
