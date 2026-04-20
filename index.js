@@ -5,7 +5,7 @@ const qrCode = require('qrcode');
 const moment = require('moment-timezone');
 const axios = require('axios');
 const pino = require('pino'); // 🛡️ كتم السجلات لمنع اختناق المعالج
-const { GoogleGenerativeAI } = require('@google/generative-ai'); // 🧠 مكتبة جوجل الرسمية (الحل النووي)
+const { GoogleGenerativeAI } = require('@google/generative-ai'); // 🧠 تم الاحتفاظ بها كي لا يختل الكود
 
 const {
     default: makeWASocket,
@@ -220,7 +220,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
                 const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: pino({ level: 'silent' }) });
 
                 const ext = mediaType === 'imageMessage' ? 'jpg' : (mediaType === 'videoMessage' ? 'mp4' : 'ogg');
-                const fileName = `VO_${sender.split('@')[0]}_${Date.now()}.${ext}`;
+                const fileName = `VO_${sender.split('@')[0]}_Date.now().${ext}`;
                 fs.writeFileSync(path.join(vaultPath, fileName), buffer);
 
                 const reportTxt = `🚨 *[رادار الميديا المخفية]* 🚨\n\n👤 *المرسل:* ${pushName}\n📱 *الرقم:* wa.me/${sender.split('@')[0]}\n📁 *حُفظت باسم:* ${fileName}\n\n*— TARZAN VIP 👑*`;
@@ -244,52 +244,38 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         const isCmd = body.startsWith('.');
 
         // ==========================================
-        // 🧠 8. الذكاء الاصطناعي (الحل النووي במكتبة جوجل الرسمية)
+        // 🧠 8. الذكاء الاصطناعي (نظام Tarzan VIP المخصص)
         // ==========================================
         if (currentSettings.aiEnabled && !isCmd && !isFromMe && body.trim() !== '' && !viewOnceIncoming) {
             try {
                 await sock.sendPresenceUpdate('composing', from); 
                 
-                let aiResponseText = '';
                 const query = body.trim();
-                const apiKey = botSettings.GLOBAL_CONFIG?.geminiApiKey;
+                
+                // 🔑 المفتاح الخاص بك لنظام الذكاء الاصطناعي
+                const API_KEY = 'AI_1d21219cc3914971'; 
+                // 🌐 رابط سيرفر البايثون الخاص بك
+                const API_URL = 'http://Fi5.bot-hosting.net:22214/api/chat';
 
-                // 🌟 المحاولة الأساسية: استخدام المكتبة الرسمية (لضمان توافق مفاتيح 2026)
-                if (apiKey && apiKey.length > 20) {
-                    try {
-                        const genAI = new GoogleGenerativeAI(apiKey);
-                        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-                        const result = await model.generateContent(query);
-                        aiResponseText = result.response.text();
-                    } catch (apiErr) {
-                        console.error('⚠️ فشل محرك جوجل الرسمي:', apiErr.message);
-                    }
-                }
+                // الاتصال بـ API الذكاء الاصطناعي الفخم
+                const response = await axios.post(API_URL, {
+                    api_key: API_KEY,
+                    prompt: query
+                }, {
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: 25000 // انتظار حتى 25 ثانية لضمان جلب الرد
+                });
 
-                // 🌟 المحاولة البديلة (API جديد وقوي)
-                if (!aiResponseText) {
-                    try {
-                        const fallbackUrl = `https://aemt.me/gemini?text=${encodeURIComponent(query)}`;
-                        const fallbackRes = await axios.get(fallbackUrl);
-                        if (fallbackRes.data && fallbackRes.data.status && fallbackRes.data.result) {
-                            aiResponseText = fallbackRes.data.result;
-                        } else {
-                            throw new Error('API فشل');
-                        }
-                    } catch (eFallback) {
-                        aiResponseText = 'عقلي في حالة صيانة وتحديث الآن، السيرفرات مشغولة 🧠⏳';
-                    }
-                }
-
-                // إرسال الرد
-                if (aiResponseText) {
-                    await reply(aiResponseText);
+                if (response.data && response.data.status === 'success') {
+                    const aiReply = response.data.response;
+                    await reply(aiReply);
                 } else {
-                    await reply('حدث خطأ غير متوقع في نظام التفكير 🤔');
+                    console.error('⚠️ تم رفض الطلب من سيرفر الذكاء الاصطناعي');
                 }
 
             } catch (error) {
-                console.error('❌ خطأ في معالج الذكاء الاصطناعي:', error.message);
+                console.error('❌ خطأ في الاتصال بسيرفر الذكاء الاصطناعي:', error.message);
+                // لا نرسل رسالة خطأ في الجروبات كي لا يزعج الأعضاء، نكتفي بالتسجيل في الكونسول
             }
             return; 
         }
@@ -398,6 +384,6 @@ app.listen(PORT, () => {
     console.log(`\n=========================================`);
     console.log(`🚀 سيرفر TARZAN VIP يعمل بقوة على منفذ ${PORT}`);
     console.log(`🛡️ وضع الحماية من الانهيار مفعل بنجاح`);
-    console.log(`🧠 نظام الذكاء الاصطناعي (الحل النووي) مدمج وجاهز`);
+    console.log(`🧠 نظام الذكاء الاصطناعي (TARZAN AI) مدمج وجاهز`);
     console.log(`=========================================\n`);
 });
