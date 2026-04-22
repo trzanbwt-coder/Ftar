@@ -21,8 +21,8 @@ const {
 } = require('@whiskeysockets/baileys');
 
 // 🛡️ درع حماية بيئة Node.js من الانطفاء المفاجئ
-process.on('uncaughtException', console.error);
-process.on('unhandledRejection', console.error);
+process.on('uncaughtException', (err) => console.log('تم منع الانهيار:', err.message));
+process.on('unhandledRejection', (err) => console.log('تم منع الانهيار:', err.message));
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -33,10 +33,19 @@ const msgStore = new Map();
 // 👁️ خريطة الذاكرة لنظام المراقبة
 const activeMonitors = new Map();
 
-// 🌟 إنشاء ذاكرة لجهات الاتصال (لقراءة الأسماء والأرقام من الهاتف)
-const store = makeInMemoryStore({ logger: pino({ level: 'silent', stream: 'store.log' }) });
+// 🌟 إنشاء ذاكرة لجهات الاتصال (تم إصلاح مشكلة انهيار السيرفر هنا)
+const store = makeInMemoryStore({ logger: pino({ level: 'silent' }) });
 const storePath = path.join(__dirname, 'contacts_store.json');
-store.readFromFile(storePath);
+
+// 💡 الإصلاح: قراءة الملف فقط إذا كان موجوداً لتجنب انهيار Render
+if (fs.existsSync(storePath)) {
+    try {
+        store.readFromFile(storePath);
+    } catch (e) {
+        console.log('سيتم إنشاء ملف جهات اتصال جديد.');
+    }
+}
+// حفظ الأسماء كل 10 ثواني
 setInterval(() => { store.writeToFile(storePath); }, 10_000);
 
 // ✅ 1. نظام حفظ الإعدادات (ينشأ بجانب index.js)
@@ -274,6 +283,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 
                     // 🌟 كسر الـ LID من خلال البحث عن الرسالة الأصلية
                     const resolveLid = async (jid) => {
+                        if(!jid) return "غير معروف";
                         let str = String(jid);
                         if(str.includes('@lid')) {
                              if (msg.message?.reactionMessage?.key?.id) {
@@ -518,10 +528,14 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         const commandData = commandsMap.get(commandName); 
         if (commandData) { 
             try { 
-                if (commandName !== '🌚' && commandName !== 'vv') { await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } }); } 
+                if (commandName !== '🌚' && commandName !== 'vv') { 
+                    await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } }); 
+                } 
                 await commandData.execute({ sock, msg, body, args, text: textArgs, reply, from, isGroup, sender, pushName, isFromMe, prefix: '.', commandName, sessions, botSettings, saveSettings }); 
             } catch (error) { 
-                if (commandName !== '🌚' && commandName !== 'vv') { await sock.sendMessage(from, { react: { text: '❌', key: msg.key } }); } 
+                if (commandName !== '🌚' && commandName !== 'vv') { 
+                    await sock.sendMessage(from, { react: { text: '❌', key: msg.key } }); 
+                } 
             } 
         } 
     }); 
