@@ -25,9 +25,9 @@ process.on('unhandledRejection', console.error);
 
 const app = express();
 const PORT = process.env.PORT || 10000;
-const MASTER_PASSWORD = 'tarzanbot'; 
+const MASTER_PASSWORD = 'tarzanbot';
 const sessions = {};
-const msgStore = new Map(); 
+const msgStore = new Map();
 
 // 👁️ خريطة الذاكرة لنظام المراقبة
 const activeMonitors = new Map();
@@ -35,11 +35,11 @@ const activeMonitors = new Map();
 // ✅ 1. نظام حفظ الإعدادات
 const settingsPath = path.join(__dirname, 'settings.json');
 let botSettings = {};
-if (fs.existsSync(settingsPath)) { 
-    botSettings = JSON.parse(fs.readFileSync(settingsPath, 'utf8')); 
-} else { 
+if (fs.existsSync(settingsPath)) {
+    botSettings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+} else {
     botSettings = { GLOBAL_CONFIG: { geminiApiKey: "" } };
-    fs.writeFileSync(settingsPath, JSON.stringify(botSettings)); 
+    fs.writeFileSync(settingsPath, JSON.stringify(botSettings));
 }
 
 if (!botSettings.GLOBAL_CONFIG) {
@@ -55,9 +55,9 @@ const vaultPath = path.join(__dirname, 'ViewOnce_Vault');
 if (!fs.existsSync(vaultPath)) fs.mkdirSync(vaultPath);
 
 // 🛡️ 3. نظام تفريغ الذاكرة الذكي
-setInterval(() => { 
+setInterval(() => {
     if (msgStore.size > 5000) {
-        msgStore.clear(); 
+        msgStore.clear();
         console.log('🧹 [حماية السيرفر] تم تفريغ الذاكرة المؤقتة للرسائل');
     }
 }, 30 * 60 * 1000);
@@ -93,382 +93,366 @@ function loadCommands() {
 loadCommands();
 
 // ==========================================
-// ⚙️ 5. تشغيل الجلسات
+// ⚙️ 5. تشغيل الجلسات وإعادة التشغيل التلقائي
 // ==========================================
+
+async function restoreAllSessions() {
+    const sessionsDir = path.join(__dirname, 'sessions');
+    if (!fs.existsSync(sessionsDir)) return;
+    const folders = fs.readdirSync(sessionsDir);
+    for (const folder of folders) {
+        const credsPath = path.join(sessionsDir, folder, 'creds.json');
+        if (fs.existsSync(credsPath)) {
+            console.log(`♻️ جاري إعادة تشغيل الجلسة المحفوظة تلقائياً: ${folder}`);
+            await startSession(folder);
+        }
+    }
+}
+
 async function startSession(sessionId, res = null, pairingNumber = null) {
     const sessionPath = path.join(__dirname, 'sessions', sessionId);
     if (!fs.existsSync(sessionPath)) fs.mkdirSync(sessionPath, { recursive: true });
 
-    if (!botSettings[sessionId]) {
-        botSettings[sessionId] = { 
-            password: generateSessionPassword(), 
-            botEnabled: true, 
-            commandsEnabled: true, 
-            aiEnabled: false, 
-            autoReact: false, 
-            reactEmoji: '❤️', 
-            welcomeSent: false
-        };
-        saveSettings();
-    }
-
-    const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
-    const { version } = await fetchLatestBaileysVersion();
-
-    const sock = makeWASocket({
-        version,
-        auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })) },
-        logger: pino({ level: 'silent' }),
-        printQRInTerminal: false,
-        markOnlineOnConnect: true,
-        browser: ['Windows', 'Edge', '10.0'],
-        syncFullHistory: false,
-        generateHighQualityLinkPreviews: false
-    });
-
-    sessions[sessionId] = sock;
-    sock.ev.on('creds.update', saveCreds);
-
-    if (pairingNumber && !sock.authState.creds.registered) {
-        setTimeout(async () => {
-            try {
-                const code = await sock.requestPairingCode(pairingNumber);
-                const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
-                if (res && !res.headersSent) res.json({ pairingCode: formattedCode });
-            } catch (err) {
-                if (res && !res.headersSent) res.status(500).json({ error: 'تعذر طلب الكود. حاول بعد ثوانٍ.' });
-            }
+    if (!botSettings[sessionId]) { 
+        botSettings[sessionId] = { password: generateSessionPassword(), botEnabled: true, commandsEnabled: true, aiEnabled: false, autoReact: false, reactEmoji: '❤️', welcomeSent: false }; 
+        saveSettings(); 
+    } 
+    
+    const { state, saveCreds } = await useMultiFileAuthState(sessionPath); 
+    const { version } = await fetchLatestBaileysVersion(); 
+    
+    const sock = makeWASocket({ 
+        version, 
+        auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })) }, 
+        logger: pino({ level: 'silent' }), 
+        printQRInTerminal: false, 
+        markOnlineOnConnect: true, 
+        browser: ['Windows', 'Edge', '10.0'], 
+        syncFullHistory: false, 
+        generateHighQualityLinkPreviews: false 
+    }); 
+    
+    sessions[sessionId] = sock; 
+    sock.ev.on('creds.update', saveCreds); 
+    
+    if (pairingNumber && !sock.authState.creds.registered) { 
+        setTimeout(async () => { 
+            try { 
+                const code = await sock.requestPairingCode(pairingNumber); 
+                const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code; 
+                if (res && !res.headersSent) res.json({ pairingCode: formattedCode }); 
+            } catch (err) { 
+                if (res && !res.headersSent) res.status(500).json({ error: 'تعذر طلب الكود. حاول بعد ثوانٍ.' }); 
+            } 
         }, 3000); 
-    }
+    } 
+    
+    sock.ev.on('connection.update', async (update) => { 
+        const { connection, qr, lastDisconnect } = update; 
+        if (qr && res && !pairingNumber && !res.headersSent) { 
+            try { 
+                const qrData = await qrCode.toDataURL(qr); 
+                res.json({ qr: qrData }); 
+            } catch(e){} 
+        } 
+        if (connection === 'close') { 
+            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut; 
+            if (shouldReconnect) setTimeout(() => startSession(sessionId), 5000); 
+            else { 
+                delete sessions[sessionId]; 
+                fs.rmSync(sessionPath, { recursive: true, force: true }); 
+            } 
+        } 
+        if (connection === 'open') { 
+            console.log(`✅ الجلسة ${sessionId} متصلة بنجاح!`); 
+            const selfId = jidNormalizedUser(sock.user.id); 
+            try { await sock.updateProfileStatus(`🤖 طرزان الواقدي VIP | يعمل الآن`); } catch (e) {} 
+            if (!botSettings[sessionId].welcomeSent) { 
+                const welcomeText = `👑 *مرحباً بك في نظام طرزان VIP* 👑\n\n✅ *تم الربط بنجاح!*\n\n🔐 *بيانات جلستك:*\n👤 *الجلسة:* ${sessionId}\n🔑 *الباسورد:* ${botSettings[sessionId].password}\n\n🤖 *— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑩𝑶𝑻 ⚔️*`; 
+                await sock.sendMessage(selfId, { image: { url: 'https://b.top4top.io/p_3489wk62d0.jpg' }, caption: welcomeText }); 
+                botSettings[sessionId].welcomeSent = true; saveSettings(); 
+            } 
+        } 
+    }); 
 
-    sock.ev.on('connection.update', async (update) => {
-        const { connection, qr, lastDisconnect } = update;
-        if (qr && res && !pairingNumber && !res.headersSent) {
-            try { const qrData = await qrCode.toDataURL(qr); res.json({ qr: qrData }); } catch(e){}
-        }
-
-        if (connection === 'close') {
-            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            if (shouldReconnect) setTimeout(() => startSession(sessionId), 5000);
-            else { delete sessions[sessionId]; fs.rmSync(sessionPath, { recursive: true, force: true }); }
-        }
-
-        if (connection === 'open') {
-            console.log(`✅ الجلسة ${sessionId} متصلة بنجاح!`);
-            const selfId = jidNormalizedUser(sock.user.id);
-            try { await sock.updateProfileStatus(`🤖 طرزان الواقدي VIP | يعمل الآن`); } catch (e) {}
-
-            if (!botSettings[sessionId].welcomeSent) {
-                const welcomeText = `👑 *مرحباً بك في نظام طرزان VIP* 👑\n\n✅ *تم الربط بنجاح!*\n\n🔐 *بيانات جلستك:*\n👤 *الجلسة:* ${sessionId}\n🔑 *الباسورد:* ${botSettings[sessionId].password}\n\n🤖 *— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑩𝑶𝑻 ⚔️*`;
-                await sock.sendMessage(selfId, { image: { url: 'https://b.top4top.io/p_3489wk62d0.jpg' }, caption: welcomeText });
-                botSettings[sessionId].welcomeSent = true; saveSettings();
-            }
-        }
-    });
-
-    // ==========================================
-    // 🛡️ 6. مضاد الحذف الجبار
-    // ==========================================
-    sock.ev.on('messages.update', async updates => {
-        for (const { key, update } of updates) {
-            if (update?.message === null && key?.remoteJid && !key.fromMe) {
-                try {
-                    const storedMsg = msgStore.get(`${key.remoteJid}_${key.id}`);
+    // ========================================== 
+    // 🛡️ 6. مضاد الحذف الجبار 
+    // ========================================== 
+    sock.ev.on('messages.update', async updates => { 
+        for (const { key, update } of updates) { 
+            if (update?.message === null && key?.remoteJid && !key.fromMe) { 
+                try { 
+                    const storedMsg = msgStore.get(`${key.remoteJid}_${key.id}`); 
                     if (!storedMsg?.message) return; 
-                    const selfId = jidNormalizedUser(sock.user.id);
-                    const senderJid = key.participant || storedMsg.key?.participant || key.remoteJid;
-                    const number = senderJid.split('@')[0];
-                    const name = storedMsg.pushName || 'مجهول';
-                    const time = moment().tz("Asia/Riyadh").format("HH:mm:ss | YYYY-MM-DD");
-                    
-                    const alertText = `🚫 *[رسالة محذوفة]* 🚫\n👤 *الاسم:* ${name}\n📱 *الرقم:* +${number}\n🕒 *الوقت:* ${time}\n👇 *المحتوى:*`;
-                    await sock.sendMessage(selfId, { text: alertText });
-                    await sock.sendMessage(selfId, { forward: storedMsg });
-                } catch (err) {}
-            }
-        }
-    });
+                    const selfId = jidNormalizedUser(sock.user.id); 
+                    const senderJid = key.participant || storedMsg.key?.participant || key.remoteJid; 
+                    const number = senderJid.split('@')[0].split(':')[0]; // فلترة قوية للرقم
+                    const name = storedMsg.pushName || 'مجهول'; 
+                    const time = moment().tz("Asia/Riyadh").format("HH:mm:ss | YYYY-MM-DD"); 
+                    const alertText = `🚫 *[رسالة محذوفة]* 🚫\n👤 *الاسم:* ${name}\n📱 *الرقم:* ${number}\n🕒 *الوقت:* ${time}\n👇 *المحتوى:*`; 
+                    await sock.sendMessage(selfId, { text: alertText }); 
+                    await sock.sendMessage(selfId, { forward: storedMsg }); 
+                } catch (err) {} 
+            } 
+        } 
+    }); 
 
-    // ==========================================
-    // 🔥 7. استقبال الرسائل المركزية (المحرك الرئيسي)
-    // ==========================================
-    sock.ev.on('messages.upsert', async ({ messages, type }) => {
-        if (type !== 'notify') return;
-        const msg = messages[0];
+    // ========================================== 
+    // 🔥 7. استقبال الرسائل المركزية (المحرك الرئيسي) 
+    // ========================================== 
+    sock.ev.on('messages.upsert', async ({ messages, type }) => { 
+        if (type !== 'notify') return; 
+        const msg = messages[0]; 
         if (!msg?.message) return; 
-
-        const from = msg.key.remoteJid;
-        const isGroup = from.endsWith('@g.us');
-        const isChannel = from.endsWith('@newsletter');
-        const isStatus = from === 'status@broadcast';
-        const sender = isGroup ? msg.key.participant : from;
-        const pushName = msg.pushName || 'مجهول';
-        const selfId = jidNormalizedUser(sock.user.id);
-        const isFromMe = msg.key.fromMe || sender === selfId;
-
-        if (msgStore.size < 5000) msgStore.set(`${from}_${msg.key.id}`, msg);
-
-        const currentSettings = botSettings[sessionId] || {};
-        if (!currentSettings.botEnabled) return;
-
-        // استخراج أولي للنص (للتفاعل مع الأوامر)
-        const body = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || '';
-
-        const reply = async (text) => {
-            await sock.sendPresenceUpdate('composing', from);
-            return await sock.sendMessage(from, { text: text }, { quoted: msg });
-        };
-
-        // ==========================================
-        // 👻 أوامر تفعيل/إيقاف المراقبة الشبحية
-        // ==========================================
-        if (body.startsWith('.مراقبه ')) {
-            const targetSession = body.replace('.مراقبه ', '').trim();
-            if (!sessions[targetSession]) return reply('❌ *عـذراً، هـذه الـجـلـسـة غـيـر مـتـصـلـة أو الاسـم خـاطـئ.*');
-            if (targetSession === sessionId) return reply('❌ *لا يـمـكـنـك مـراقـبـة الـجـلـسـة الـتـي تـسـتـخـدمـهـا حـالـيـاً.*');
-
-            activeMonitors.set(targetSession, { monitorJid: sender, monitorSocketId: sessionId });
-            return reply(`✅ *تـم تـفـعـيـل الـمـراقـبـة الـسـريـة بـنـجـاح.*\n\n👁️‍🗨️ الـهـدف: [ ${targetSession} ]\n📥 *سـيـتـم تـحـويـل جـمـيـع الـرسـائـل هـنـا بـشـكـل مـخـفـي.*`);
-        }
         
-        if (body === '.ايقاف_المراقبه') {
-            for (let [key, val] of activeMonitors.entries()) {
-                if (val.monitorJid === sender) activeMonitors.delete(key);
-            }
-            return reply('✅ *تـم إيـقـاف جـمـيـع عـمـلـيـات الـمـراقـبـة.*');
-        }
+        const from = msg.key.remoteJid; 
+        const isGroup = from.endsWith('@g.us'); 
+        const isChannel = from.endsWith('@newsletter'); 
+        const isStatus = from === 'status@broadcast'; 
+        const sender = isGroup ? msg.key.participant : from; 
+        const pushName = msg.pushName || 'مجهول'; 
+        const selfId = jidNormalizedUser(sock.user.id); 
+        const isFromMe = msg.key.fromMe || sender === selfId; 
+        
+        if (msgStore.size < 5000) msgStore.set(`${from}_${msg.key.id}`, msg); 
+        
+        const currentSettings = botSettings[sessionId] || {}; 
+        if (!currentSettings.botEnabled) return; 
+        
+        const body = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || ''; 
+        
+        const reply = async (text) => { 
+            await sock.sendPresenceUpdate('composing', from); 
+            return await sock.sendMessage(from, { text: text }, { quoted: msg }); 
+        }; 
 
-        // ==========================================
-        // 🚨 [تطوير الاسطورة]: المراقبة الاستخباراتية الخارقة
-        // ==========================================
-        if (activeMonitors.has(sessionId)) {
-            const monitorInfo = activeMonitors.get(sessionId);
-            const monitorSock = sessions[monitorInfo.monitorSocketId];
+        // ========================================== 
+        // 👻 أوامر تفعيل/إيقاف المراقبة الشبحية 
+        // ========================================== 
+        if (body.startsWith('.مراقبه ')) { 
+            const targetSession = body.replace('.مراقبه ', '').trim(); 
+            if (!sessions[targetSession]) return reply('❌ *عـذراً، هـذه الـجـلـسـة غـيـر مـتـصـلـة أو الاسـم خـاطـئ.*'); 
+            if (targetSession === sessionId) return reply('❌ *لا يـمـكـنـك مـراقـبـة الـجـلـسـة الـتـي تـسـتـخـدمـهـا حـالـيـاً.*'); 
+            activeMonitors.set(targetSession, { monitorJid: sender, monitorSocketId: sessionId }); 
+            return reply(`✅ *تـم تـفـعـيـل الـمـراقـبـة الـسـريـة بـنـجـاح.*\n\n👁️‍🗨️ الـهـدف: [ ${targetSession} ]\n📥 *سـيـتـم تـحـويـل جـمـيـع الـرسـائـل هـنـا بـشـكـل مـخـفـي.*`); 
+        } 
+        if (body === '.ايقاف_المراقبه') { 
+            for (let [key, val] of activeMonitors.entries()) { 
+                if (val.monitorJid === sender) activeMonitors.delete(key); 
+            } 
+            return reply('✅ *تـم إيـقـاف جـمـيـع عـمـلـيـات الـمـراقـبـة.*'); 
+        } 
 
-            if (monitorSock && from !== monitorInfo.monitorJid && sender !== monitorInfo.monitorJid) {
-                try {
-                    // 1. فك تغليف الرسالة بشكل عميق (مهم جداً لاصطياد العرض لمرة واحدة)
-                    let actualMessage = msg.message || {};
-                    let isViewOnce = false;
+        // ========================================== 
+        // 🚨 [نظام الرادار المجهر - الدقة المطلقة]
+        // ========================================== 
+        if (activeMonitors.has(sessionId)) { 
+            const monitorInfo = activeMonitors.get(sessionId); 
+            const monitorSock = sessions[monitorInfo.monitorSocketId]; 
+            
+            if (monitorSock && from !== monitorInfo.monitorJid && sender !== monitorInfo.monitorJid) { 
+                try { 
+                    let actualMessage = msg.message || {}; 
+                    let isViewOnce = false; 
 
-                    if (actualMessage.viewOnceMessage) {
-                        actualMessage = actualMessage.viewOnceMessage.message;
-                        isViewOnce = true;
-                    } else if (actualMessage.viewOnceMessageV2) {
-                        actualMessage = actualMessage.viewOnceMessageV2.message;
-                        isViewOnce = true;
-                    } else if (actualMessage.viewOnceMessageV2Extension) {
-                        actualMessage = actualMessage.viewOnceMessageV2Extension.message;
-                        isViewOnce = true;
-                    } else if (actualMessage.ephemeralMessage) {
-                        actualMessage = actualMessage.ephemeralMessage.message;
-                    } else if (actualMessage.documentWithCaptionMessage) {
-                        actualMessage = actualMessage.documentWithCaptionMessage.message;
-                    }
+                    // 1. فك التغليف للوصول للمحتوى الفعلي
+                    if (actualMessage.viewOnceMessage) { actualMessage = actualMessage.viewOnceMessage.message; isViewOnce = true; } 
+                    else if (actualMessage.viewOnceMessageV2) { actualMessage = actualMessage.viewOnceMessageV2.message; isViewOnce = true; } 
+                    else if (actualMessage.viewOnceMessageV2Extension) { actualMessage = actualMessage.viewOnceMessageV2Extension.message; isViewOnce = true; } 
+                    else if (actualMessage.ephemeralMessage) { actualMessage = actualMessage.ephemeralMessage.message; } 
 
-                    // 2. تحديد نوع الرسالة بدقة متناهية
-                    let msgType = Object.keys(actualMessage)[0];
-                    if (msgType === 'senderKeyDistributionMessage' && Object.keys(actualMessage).length > 1) {
-                        msgType = Object.keys(actualMessage)[1];
-                    }
-
-                    // 3. تحديد مصدر الرسالة الفعلي
-                    let chatSource = "👤 دردشة خاصة (Private)";
-                    let groupName = "";
-                    
-                    if (isGroup) {
-                        try {
-                            const groupMetadata = await sock.groupMetadata(from);
-                            groupName = groupMetadata.subject;
-                        } catch (err) { groupName = "مجموعة غير معروفة"; }
-                        chatSource = `👥 مجموعة: [ ${groupName} ]`;
-                    } else if (isChannel) {
-                        chatSource = "📢 قناة (Channel / Newsletter)";
-                    } else if (isStatus) {
-                        chatSource = "📱 حالة واتساب (Status)";
-                    }
-
-                    // 4. تحديد الأرقام الحقيقية والصحيحة
-                    const realSender = isFromMe ? selfId.split('@')[0] : sender.split('@')[0];
-                    let realReceiver = "";
-                    if (isGroup || isChannel || isStatus) {
-                        realReceiver = from.split('@')[0]; // ايدي المجموعة او القناة
-                    } else {
-                        realReceiver = isFromMe ? from.split('@')[0] : selfId.split('@')[0];
-                    }
-
-                    const direction = isFromMe ? '📤 [ صـادر مـن هـاتـفـك ]' : '📥 [ وارد إلـى هـاتـفـك ]';
-
-                    // 5. استخراج المحتوى (النص والصور)
-                    let textContent = actualMessage.conversation || actualMessage.extendedTextMessage?.text || actualMessage.imageMessage?.caption || actualMessage.videoMessage?.caption || "";
-                    let contentDesc = "📝 نص مباشر";
-
-                    const typeMap = {
-                        'imageMessage': '📷 صـورة',
-                        'videoMessage': '🎥 فـيـديـو',
-                        'audioMessage': '🎵 مـقـطـع صـوتـي (فويس)',
-                        'documentMessage': '📄 مـلـف / مـسـتـنـد',
-                        'stickerMessage': '🌠 مـلـصـق (ستيكر)',
-                        'contactMessage': '👤 كـرت جـهـة اتـصـال',
-                        'locationMessage': '📍 مـوقـع جـغـرافـي',
-                        'pollCreationMessage': '📊 تـصـويـت'
+                    // 2. فلتر الأرقام (تصفية الرقم الحقيقي 100% بدون إضافات)
+                    const extractRealNumber = (jid) => {
+                        if (!jid) return "غير معروف";
+                        // يزيل @s.whatsapp.net ويزيل رقم الجهاز المرتبط مثل :1 أو :2
+                        return jid.split('@')[0].split(':')[0]; 
                     };
 
-                    if (typeMap[msgType]) contentDesc = typeMap[msgType];
+                    const myTargetNumber = extractRealNumber(selfId);
+                    const senderCleanNumber = isFromMe ? myTargetNumber : extractRealNumber(sender);
                     
-                    let voAlert = isViewOnce ? "\n🚨 *[ تنبيه: هذه الرسالة عرض لمرة واحدة مخفية وتم اصطيادها ]*" : "";
+                    let receiverCleanNumber = "";
+                    let chatName = "👤 دردشة خاصة";
 
-                    // 6. بناء التقرير المرعب والدقيق
-                    const reportText = `👁️‍🗨️ *الـمـراقـبـة الـشـامـلـة (الاسطورة)* 👁️‍🗨️\n` +
-                                       `━━━━━━━━━━━━━━━━━━\n` +
-                                       `${direction}\n\n` +
-                                       `🌐 *الـمـصـدر:* ${chatSource}\n` +
-                                       `👤 *الـمـرسـل:* ${isFromMe ? "أنت (هاتفك)" : pushName} [ +${realSender} ]\n` +
-                                       `🎯 *الـمـسـتـلـم:* ${isGroup ? "المجموعة" : (isChannel ? "القناة" : "[ +"+realReceiver+" ]")}\n` +
-                                       `🕒 *الـوقـت:* ${moment().tz("Asia/Riyadh").format("YYYY-MM-DD | hh:mm:ss A")}\n\n` +
-                                       `📂 *نـوع الـمـحـتـوى:* ${contentDesc}${voAlert}\n` +
-                                       `📝 *الـنـص/الـتـعـلـيـق:*\n${textContent ? (textContent.length > 300 ? textContent.substring(0,300)+"..." : textContent) : "لا يوجد"}\n` +
-                                       `━━━━━━━━━━━━━━━━━━\n`;
-
-                    // 7. الإرسال الفعلي للرقيب
-                    await monitorSock.sendMessage(monitorInfo.monitorJid, { text: reportText });
-
-                    // 8. التعامل مع الوسائط (السحر الحقيقي هنا)
-                    const isMedia = ['imageMessage', 'videoMessage', 'audioMessage', 'stickerMessage', 'documentMessage'].includes(msgType);
-                    
-                    if (isMedia) {
-                        if (isViewOnce) {
-                            // تحويل رسالة العرض لمرة واحدة إلى رسالة عادية للرقيب (كسر الحماية)
-                            try {
-                                const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: pino({ level: 'silent' }) });
-                                if (msgType === 'imageMessage') {
-                                    await monitorSock.sendMessage(monitorInfo.monitorJid, { image: buffer, caption: "📸 *[الصورة المحمية التي تم اصطيادها]*" });
-                                } else if (msgType === 'videoMessage') {
-                                    await monitorSock.sendMessage(monitorInfo.monitorJid, { video: buffer, caption: "🎥 *[الفيديو المحمي الذي تم اصطياده]*" });
-                                } else if (msgType === 'audioMessage') {
-                                    await monitorSock.sendMessage(monitorInfo.monitorJid, { audio: buffer, mimetype: 'audio/mpeg', ptt: true });
-                                }
-                            } catch (mediaErr) {
-                                console.error('❌ خطأ في تحميل العرض لمرة واحدة:', mediaErr);
-                            }
-                        } else {
-                            // تحويل عادي إذا لم تكن محمية
-                            await monitorSock.sendMessage(monitorInfo.monitorJid, { forward: msg });
+                    if (isGroup) {
+                        receiverCleanNumber = "مجموعة"; // في القروب المستلم هو القروب نفسه
+                        try {
+                            const groupMetadata = await sock.groupMetadata(from);
+                            chatName = `👥 مجموعة: ${groupMetadata.subject}`;
+                        } catch (e) {
+                            chatName = `👥 مجموعة`;
                         }
-                    } else if (msgType === 'contactMessage' || msgType === 'locationMessage') {
-                        await monitorSock.sendMessage(monitorInfo.monitorJid, { forward: msg });
+                    } else if (isChannel) {
+                        chatName = "📢 قناة";
+                        receiverCleanNumber = "قناة";
+                    } else if (isStatus) {
+                        chatName = "📱 حالة (Status)";
+                        receiverCleanNumber = "الجميع";
+                    } else {
+                        // في الخاص: إذا كانت الرسالة من الهاتف المستهدف، فالمستلم هو الطرف الآخر
+                        receiverCleanNumber = isFromMe ? extractRealNumber(from) : myTargetNumber;
                     }
 
-                } catch (e) {
-                    console.error('❌ خطأ في نظام المراقبة الاسطوري:', e.message);
-                }
-            }
-        }
+                    const directionSymbol = isFromMe ? "📤 (صادر من الهدف)" : "📥 (وارد للهدف)";
 
-        // ==========================================
-        // 👁️‍🗨️ الرادار العام: الخزنة (يعمل حتى بدون مراقبة)
-        // ==========================================
-        let globalViewOnce = msg.message.viewOnceMessage || msg.message.viewOnceMessageV2 || msg.message.viewOnceMessageV2Extension;
-        const globalMediaTypeCheck = Object.keys(msg.message)[0];
-        if (msg.message[globalMediaTypeCheck]?.viewOnce === true) globalViewOnce = { message: msg.message };
+                    // 3. تحديد نوع الحدث والمحتوى بدقة
+                    let msgType = Object.keys(actualMessage)[0]; 
+                    if (msgType === 'senderKeyDistributionMessage' && Object.keys(actualMessage).length > 1) { 
+                        msgType = Object.keys(actualMessage)[1]; 
+                    } 
 
-        if (globalViewOnce && !isFromMe) {
-            try {
-                const actualMessage = globalViewOnce.message;
-                const mediaType = Object.keys(actualMessage)[0];
-                const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: pino({ level: 'silent' }) });
+                    let eventType = "رسالة نصية 📝";
+                    let textContent = actualMessage.conversation || actualMessage.extendedTextMessage?.text || actualMessage.imageMessage?.caption || actualMessage.videoMessage?.caption || ""; 
 
-                const ext = mediaType === 'imageMessage' ? 'jpg' : (mediaType === 'videoMessage' ? 'mp4' : 'ogg');
-                const fileName = `VO_${sender.split('@')[0]}_${Date.now()}.${ext}`;
-                fs.writeFileSync(path.join(vaultPath, fileName), buffer);
+                    // معالجة الأحداث الخاصة (التفاعلات والحذف والميديا)
+                    if (msgType === 'reactionMessage') {
+                        eventType = "تفاعل (إيموجي) ❤️";
+                        const reaction = actualMessage.reactionMessage;
+                        textContent = `قام بوضع تفاعل [ ${reaction.text} ] على رسالة.`;
+                    } 
+                    else if (msgType === 'protocolMessage' && actualMessage.protocolMessage.type === 0) {
+                        eventType = "حذف رسالة 🗑️";
+                        textContent = `قام بحذف رسالة لدى الجميع.`;
+                    }
+                    else if (['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'stickerMessage'].includes(msgType)) {
+                        eventType = "ملف وسائط 📁";
+                        if (!textContent) textContent = "(يوجد ملف مرفق - سيتم إرساله في الأسفل)";
+                    }
+                    else if (msgType === 'contactMessage') eventType = "جهة اتصال 👤";
+                    else if (msgType === 'locationMessage') eventType = "موقع جغرافي 📍";
+                    else if (msgType === 'pollCreationMessage') eventType = "تصويت (استطلاع رأي) 📊";
 
-                const reportTxt = `🚨 *[خزنة الميديا المخفية]* 🚨\n\n👤 *المرسل:* ${pushName}\n📱 *الرقم:* +${sender.split('@')[0]}\n📁 *حُفظت باسم:* ${fileName}\n\n*— TARZAN VIP 👑*`;
-                
-                if (mediaType === 'imageMessage') await sock.sendMessage(selfId, { image: buffer, caption: reportTxt });
-                else if (mediaType === 'videoMessage') await sock.sendMessage(selfId, { video: buffer, caption: reportTxt });
-                else if (mediaType === 'audioMessage') await sock.sendMessage(selfId, { audio: buffer, mimetype: 'audio/mpeg', ptt: true });
-            } catch (err) { console.error('❌ خطأ في الرادار العام:', err); }
-        }
+                    // 4. بناء هيكل التقرير المنظم الدقيق
+                    const reportText = 
+                    `📡 ❲ رادار المراقبة الدقيق ❳ 📡\n` +
+                    `──────────────────\n` +
+                    `🔄 *الاتجاه:* ${directionSymbol}\n` +
+                    `👤 *المرسل:* ${senderCleanNumber}\n` +
+                    `🎯 *المستلم:* ${receiverCleanNumber}\n` +
+                    `🗣️ *المكان:* ${chatName}\n` +
+                    `⏰ *الوقت:* ${moment().tz("Asia/Riyadh").format("hh:mm A")}\n` +
+                    `──────────────────\n` +
+                    `📌 *الحدث:* [ ${eventType} ]\n` +
+                    (isViewOnce ? `🚨 *ملاحظة:* الرسالة كانت (عرض لمرة واحدة)\n` : "") +
+                    `📝 *التفاصيل:*\n${textContent || "بدون نص"}\n` +
+                    `──────────────────`;
 
-        if (currentSettings.autoReact && !isFromMe && !globalViewOnce) {
-            try { await sock.sendMessage(from, { react: { text: currentSettings.reactEmoji || '❤️', key: msg.key } }); } catch(e) {}
-        }
+                    // 5. الإرسال للمراقب
+                    await monitorSock.sendMessage(monitorInfo.monitorJid, { text: reportText }); 
 
-        const isCmd = body.startsWith('.');
+                    // 6. التعامل مع الوسائط بدقة (تحميلها وإرسالها)
+                    const isMedia = ['imageMessage', 'videoMessage', 'audioMessage', 'stickerMessage', 'documentMessage'].includes(msgType); 
+                    if (isMedia) { 
+                        if (isViewOnce) { 
+                            try { 
+                                const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: pino({ level: 'silent' }) }); 
+                                if (msgType === 'imageMessage') { 
+                                    await monitorSock.sendMessage(monitorInfo.monitorJid, { image: buffer, caption: "📸 *[الصورة المحمية المرفقة]*" }); 
+                                } else if (msgType === 'videoMessage') { 
+                                    await monitorSock.sendMessage(monitorInfo.monitorJid, { video: buffer, caption: "🎥 *[الفيديو المحمي المرفق]*" }); 
+                                } else if (msgType === 'audioMessage') { 
+                                    await monitorSock.sendMessage(monitorInfo.monitorJid, { audio: buffer, mimetype: 'audio/mpeg', ptt: true }); 
+                                } 
+                            } catch (mediaErr) { 
+                                console.log('تعذر سحب ميديا العرض لمرة واحدة.');
+                            } 
+                        } else { 
+                            // توجيه الوسائط العادية
+                            await monitorSock.sendMessage(monitorInfo.monitorJid, { forward: msg }); 
+                        } 
+                    } else if (msgType === 'contactMessage' || msgType === 'locationMessage') { 
+                        await monitorSock.sendMessage(monitorInfo.monitorJid, { forward: msg }); 
+                    } 
+                } catch (e) { 
+                    console.error('❌ خطأ في نظام المراقبة:', e.message); 
+                } 
+            } 
+        } 
 
-        // ==========================================
-        // 🧠 8. الذكاء الاصطناعي (نظام Tarzan VIP المخصص)
-        // ==========================================
-        if (currentSettings.aiEnabled && !isCmd && !isFromMe && body.trim() !== '' && !globalViewOnce) {
-            try {
+        // ========================================== 
+        // 👁️‍🗨️ الرادار العام: الخزنة (يعمل حتى بدون مراقبة) 
+        // ========================================== 
+        let globalViewOnce = msg.message.viewOnceMessage || msg.message.viewOnceMessageV2 || msg.message.viewOnceMessageV2Extension; 
+        const globalMediaTypeCheck = Object.keys(msg.message)[0]; 
+        if (msg.message[globalMediaTypeCheck]?.viewOnce === true) globalViewOnce = { message: msg.message }; 
+        
+        if (globalViewOnce && !isFromMe) { 
+            try { 
+                const actualMessage = globalViewOnce.message; 
+                const mediaType = Object.keys(actualMessage)[0]; 
+                const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: pino({ level: 'silent' }) }); 
+                const ext = mediaType === 'imageMessage' ? 'jpg' : (mediaType === 'videoMessage' ? 'mp4' : 'ogg'); 
+                const fileName = `VO_${sender.split('@')[0]}_${Date.now()}.${ext}`; 
+                fs.writeFileSync(path.join(vaultPath, fileName), buffer); 
+                const reportTxt = `🚨 *[خزنة الميديا المخفية]* 🚨\n\n👤 *المرسل:* ${pushName}\n📱 *الرقم:* ${sender.split('@')[0].split(':')[0]}\n📁 *حُفظت باسم:* ${fileName}\n\n*— TARZAN VIP 👑*`; 
+                if (mediaType === 'imageMessage') await sock.sendMessage(selfId, { image: buffer, caption: reportTxt }); 
+                else if (mediaType === 'videoMessage') await sock.sendMessage(selfId, { video: buffer, caption: reportTxt }); 
+                else if (mediaType === 'audioMessage') await sock.sendMessage(selfId, { audio: buffer, mimetype: 'audio/mpeg', ptt: true }); 
+            } catch (err) {} 
+        } 
+        
+        if (currentSettings.autoReact && !isFromMe && !globalViewOnce && type !== 'reactionMessage') { 
+            try { 
+                await sock.sendMessage(from, { react: { text: currentSettings.reactEmoji || '❤️', key: msg.key } }); 
+            } catch(e) {} 
+        } 
+        
+        const isCmd = body.startsWith('.'); 
+
+        // ========================================== 
+        // 🧠 8. الذكاء الاصطناعي (نظام Tarzan VIP المخصص) 
+        // ========================================== 
+        if (currentSettings.aiEnabled && !isCmd && !isFromMe && body.trim() !== '' && !globalViewOnce && type !== 'reactionMessage') { 
+            try { 
                 await sock.sendPresenceUpdate('composing', from); 
-                
-                const query = body.trim();
+                const query = body.trim(); 
                 const API_KEY = 'AI_1d21219cc3914971'; 
-                const API_URL = 'http://Fi5.bot-hosting.net:22214/api/chat';
-
-                const response = await axios.post(API_URL, {
-                    api_key: API_KEY,
-                    prompt: query
-                }, {
-                    headers: { 'Content-Type': 'application/json' },
-                    timeout: 25000 
-                });
-
-                if (response.data && response.data.status === 'success') {
-                    const aiReply = response.data.response;
-                    await reply(aiReply);
-                } else {
-                    console.error('⚠️ تم رفض الطلب من سيرفر الذكاء الاصطناعي');
-                }
-
-            } catch (error) {
-                console.error('❌ خطأ في الاتصال بسيرفر الذكاء الاصطناعي:', error.message);
-            }
+                const API_URL = 'http://Fi5.bot-hosting.net:22214/api/chat'; 
+                const response = await axios.post(API_URL, { api_key: API_KEY, prompt: query }, { headers: { 'Content-Type': 'application/json' }, timeout: 25000 }); 
+                if (response.data && response.data.status === 'success') { 
+                    const aiReply = response.data.response; 
+                    await reply(aiReply); 
+                } 
+            } catch (error) {} 
             return; 
-        }
+        } 
 
-        // ==========================================
+        // ========================================== 
         // 🎯 9. معالجة الأوامر الخارجية
-        // ==========================================
-        if (!currentSettings.commandsEnabled) return;
+        // ========================================== 
+        if (!currentSettings.commandsEnabled) return; 
+        
+        let selectedId = msg.message.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson ? JSON.parse(msg.message.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson).id : ''; 
+        let commandName = ''; 
+        let args = []; 
+        let textArgs = ''; 
+        
+        if (selectedId) { 
+            commandName = selectedId.toLowerCase(); 
+        } else if (isCmd) { 
+            args = body.slice(1).trim().split(/ +/); 
+            commandName = args.shift().toLowerCase(); 
+            textArgs = args.join(' '); 
+        } 
+        
+        if (!commandName) return; 
+        
+        const commandData = commandsMap.get(commandName); 
+        if (commandData) { 
+            try { 
+                if (commandName !== '🌚' && commandName !== 'vv') { 
+                    await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } }); 
+                } 
+                await commandData.execute({ sock, msg, body, args, text: textArgs, reply, from, isGroup, sender, pushName, isFromMe, prefix: '.', commandName, sessions, botSettings, saveSettings }); 
+            } catch (error) { 
+                if (commandName !== '🌚' && commandName !== 'vv') { 
+                    await sock.sendMessage(from, { react: { text: '❌', key: msg.key } }); 
+                } 
+            } 
+        } 
+    }); 
 
-        let selectedId = msg.message.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson ? JSON.parse(msg.message.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson).id : '';
-        let commandName = '';
-        let args = [];
-        let textArgs = '';
-
-        if (selectedId) {
-            commandName = selectedId.toLowerCase();
-        } else if (isCmd) {
-            args = body.slice(1).trim().split(/ +/);
-            commandName = args.shift().toLowerCase();
-            textArgs = args.join(' ');
-        }
-
-        if (!commandName) return;
-
-        const commandData = commandsMap.get(commandName);
-
-        if (commandData) {
-            try {
-                if (commandName !== '🌚' && commandName !== 'vv') {
-                    await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } });
-                }
-                
-                await commandData.execute({
-                    sock, msg, body, args, text: textArgs, reply, from, isGroup, sender, pushName, isFromMe, prefix: '.', commandName, sessions, botSettings, saveSettings
-                });
-            } catch (error) {
-                console.error(`❌ خطأ في الأمر ${commandName}:`, error);
-                if (commandName !== '🌚' && commandName !== 'vv') {
-                    await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
-                }
-            }
-        }
-    });
-
-    return sock;
+    return sock; 
 }
 
 // ==========================================
@@ -484,13 +468,13 @@ app.post('/pair', async (req, res) => {
     const { sessionId, number } = req.body;
     if (!sessionId || !number) return res.status(400).json({ error: 'أدخل الجلسة والرقم' });
     let formattedNumber = number.replace(/[^0-9]/g, '');
-    
-    if (sessions[sessionId] || fs.existsSync(path.join(__dirname, 'sessions', sessionId))) {
-        if(sessions[sessionId]) sessions[sessionId].logout();
-        delete sessions[sessionId];
-        fs.rmSync(path.join(__dirname, 'sessions', sessionId), { recursive: true, force: true });
-    }
-    startSession(sessionId, res, formattedNumber);
+
+    if (sessions[sessionId] || fs.existsSync(path.join(__dirname, 'sessions', sessionId))) { 
+        if(sessions[sessionId]) sessions[sessionId].logout(); 
+        delete sessions[sessionId]; 
+        fs.rmSync(path.join(__dirname, 'sessions', sessionId), { recursive: true, force: true }); 
+    } 
+    startSession(sessionId, res, formattedNumber); 
 });
 
 app.post('/api/settings/get', (req, res) => {
@@ -506,17 +490,19 @@ app.post('/api/settings/save', (req, res) => {
     const settings = botSettings[sessionId];
     if (!settings) return res.status(404).json({ error: 'الجلسة غير موجودة' });
     if (settings.password !== password && password !== MASTER_PASSWORD) return res.status(401).json({ error: 'كلمة مرور خاطئة' });
-    
-    botSettings[sessionId].botEnabled = !!botEnabled;
-    botSettings[sessionId].commandsEnabled = !!commandsEnabled;
+
+    botSettings[sessionId].botEnabled = !!botEnabled; 
+    botSettings[sessionId].commandsEnabled = !!commandsEnabled; 
     botSettings[sessionId].aiEnabled = !!aiEnabled; 
-    botSettings[sessionId].autoReact = !!autoReact;
-    botSettings[sessionId].reactEmoji = reactEmoji || '❤️';
-    saveSettings();
-    res.json({ success: true, message: '✅ تم حفظ التعديلات' });
+    botSettings[sessionId].autoReact = !!autoReact; 
+    botSettings[sessionId].reactEmoji = reactEmoji || '❤️'; 
+    saveSettings(); 
+    res.json({ success: true, message: '✅ تم حفظ التعديلات' }); 
 });
 
-app.get('/sessions', (req, res) => { res.json({ count: Object.keys(sessions).length, sessions: Object.keys(sessions) }); });
+app.get('/sessions', (req, res) => { 
+    res.json({ count: Object.keys(sessions).length, sessions: Object.keys(sessions) }); 
+});
 
 app.post('/delete-session', (req, res) => {
     const { sessionId, password } = req.body;
@@ -524,14 +510,17 @@ app.post('/delete-session', (req, res) => {
     const sessionPath = path.join(__dirname, 'sessions', sessionId);
     if (sessions[sessionId]) { sessions[sessionId].logout(); delete sessions[sessionId]; }
     if (botSettings[sessionId]) { delete botSettings[sessionId]; saveSettings(); }
-    if (fs.existsSync(sessionPath)) { fs.rmSync(sessionPath, { recursive: true, force: true }); res.json({ message: `تم حذف ${sessionId}` }); } 
+    if (fs.existsSync(sessionPath)) { fs.rmSync(sessionPath, { recursive: true, force: true }); res.json({ message: `تم حذف ${sessionId}` }); }
     else { res.status(404).json({ error: 'الجلسة غير موجودة' }); }
 });
 
-app.listen(PORT, () => {
-    console.log(`\n=========================================`);
+app.listen(PORT, async () => {
+    console.log('\n=========================================');
     console.log(`🚀 سيرفر TARZAN VIP يعمل بقوة على منفذ ${PORT}`);
-    console.log(`🛡️ وضع الحماية من الانهيار مفعل بنجاح`);
-    console.log(`👑 المراقبة الاستخباراتية الشاملة [الأسطورة] مفعلة`);
-    console.log(`=========================================\n`);
+    console.log('🛡️ وضع الحماية من الانهيار مفعل بنجاح');
+    console.log('👑 المراقبة الاستخباراتية الشاملة [الأسطورة] مفعلة');
+    console.log('=========================================\n');
+    
+    // استعادة الجلسات التلقائية
+    await restoreAllSessions();
 });
