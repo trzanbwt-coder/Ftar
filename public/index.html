@@ -464,14 +464,14 @@
                 </div>
 
                 <div class="grid grid-cols-2 gap-4 mb-4">
-                    <div class="glass-card p-5 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition" onclick="switchPage('page-connect')">
+                    <div class="glass-card p-5 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition" onclick="switchPage('page-connect', document.getElementById('nav-connect'))">
                         <div class="w-14 h-14 rounded-2xl bg-rose-500/10 text-rose-400 flex items-center justify-center text-2xl mb-3 border border-rose-500/20 shadow-inner">
                             <i class="fa-solid fa-plug-circle-plus"></i>
                         </div>
                         <h3 class="font-bold text-sm">ربط حساب</h3>
                     </div>
                     
-                    <div class="glass-card p-5 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition" onclick="switchPage('page-settings')">
+                    <div class="glass-card p-5 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition" onclick="switchPage('page-settings', document.getElementById('nav-settings'))">
                         <div class="w-14 h-14 rounded-2xl bg-fuchsia-500/10 text-fuchsia-400 flex items-center justify-center text-2xl mb-3 border border-fuchsia-500/20 shadow-inner">
                             <i class="fa-solid fa-sliders"></i>
                         </div>
@@ -678,15 +678,14 @@
                                 <input type="checkbox" id="antiBadWordsToggle" class="toggle-switch" onchange="toggleBadWordsUI()">
                             </div>
 
-                            <!-- 🤬 لوحة إدارة الكلمات الممنوعة (تظهر عند تفعيل المضاد) -->
+                            <!-- 🤬 لوحة إدارة الكلمات الممنوعة -->
                             <div id="badWordsManager" class="hidden mt-2 pt-3 border-t border-rose-500/20 pb-2">
                                 <label class="block text-xs font-bold text-rose-200/70 mb-2">أضف كلمة للقائمة السوداء:</label>
                                 <div class="flex gap-2">
                                     <input type="text" id="newBadWord" placeholder="اكتب الكلمة هنا..." class="input-vip !py-2 !px-3 !text-sm" onkeypress="if(event.key === 'Enter') addBadWord()">
-                                    <button onclick="addBadWord()" class="btn-action btn-small !py-2"><i class="fa-solid fa-plus"></i></button>
+                                    <button onclick="addBadWord()" class="btn-action btn-small !py-2 w-16"><i class="fa-solid fa-plus"></i></button>
                                 </div>
                                 <div id="badWordsListContainer" class="bad-words-container">
-                                    <!-- يتم تعبئة الكلمات الممنوعة هنا عبر الجافاسكريبت -->
                                 </div>
                             </div>
                         </div>
@@ -1018,23 +1017,20 @@
                 document.getElementById('authPanel').classList.add('hidden');
                 document.getElementById('settingsPanel').classList.remove('hidden');
                 
-                // تعبئة الأنظمة الأساسية
                 document.getElementById('botToggle').checked = data.botEnabled;
                 document.getElementById('cmdToggle').checked = data.commandsEnabled;
                 document.getElementById('aiToggle').checked = data.aiEnabled || false; 
                 document.getElementById('autoReactToggle').checked = data.autoReact;
-                document.getElementById('reactEmoji').value = data.reactEmoji || '💖';
-
-                // تعبئة الترسانة العسكرية الدقيقة
+                document.getElementById('reactEmoji').value = data.reactEmoji || '❤️';
+                
                 document.getElementById('antiCallToggle').checked = data.antiCall || false;
                 document.getElementById('antiLinkToggle').checked = data.antiLink || false;
                 document.getElementById('antiSpamToggle').checked = data.antiSpam || false;
                 document.getElementById('antiBotToggle').checked = data.antiBot || false;
                 document.getElementById('autoStatusSaveToggle').checked = data.autoStatusSave || false;
-                
-                // الكلمات الممنوعة
                 document.getElementById('antiBadWordsToggle').checked = data.antiBadWords || false;
-                currentBadWords = data.badWordsList || ['كذاب', 'نصاب', 'حمار', 'كلب', 'غبي', 'قحبه', 'شرموط', 'ورع'];
+                
+                currentBadWords = data.badWordsList || [];
                 toggleBadWordsUI();
 
                 showToast('🔓 تم فك التشفير عن الترسانة');
@@ -1046,7 +1042,6 @@
         async function saveSettings() {
             const sessionId = document.getElementById('activeSessions').value;
             
-            // 🌟 هنا يتم تجهيز جميع المتغيرات (بما فيها الحماية) لإرسالها للسيرفر
             const payload = {
                 sessionId, 
                 password: verifiedPassword,
@@ -1054,9 +1049,8 @@
                 commandsEnabled: document.getElementById('cmdToggle').checked,
                 aiEnabled: document.getElementById('aiToggle').checked,
                 autoReact: document.getElementById('autoReactToggle').checked,
-                reactEmoji: document.getElementById('reactEmoji').value.trim() || '💖',
+                reactEmoji: document.getElementById('reactEmoji').value.trim() || '❤️',
                 
-                // أزرار الحماية
                 antiCall: document.getElementById('antiCallToggle').checked,
                 antiLink: document.getElementById('antiLinkToggle').checked,
                 antiSpam: document.getElementById('antiSpamToggle').checked,
@@ -1064,7 +1058,6 @@
                 antiBadWords: document.getElementById('antiBadWordsToggle').checked,
                 autoStatusSave: document.getElementById('autoStatusSaveToggle').checked,
                 
-                // مصفوفة الكلمات
                 badWordsList: currentBadWords 
             };
 
@@ -1113,3 +1106,4 @@
     </script>
 </body>
 </html>
+
