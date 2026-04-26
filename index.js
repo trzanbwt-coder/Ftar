@@ -5,7 +5,7 @@ const qrCode = require('qrcode');
 const moment = require('moment-timezone');
 const axios = require('axios');
 const pino = require('pino'); // 🛡️ كتم السجلات لمنع اختناق المعالج
-const { GoogleGenerativeAI } = require('@google/generative-ai'); // 🧠 مكتبة جوجل (تم إرجاعها كما طلبت)
+const { GoogleGenerativeAI } = require('@google/generative-ai'); // 🧠 مكتبة جوجل
 
 const {
     default: makeWASocket,
@@ -15,7 +15,7 @@ const {
     makeCacheableSignalKeyStore,
     downloadMediaMessage,
     jidNormalizedUser,
-    generateWAMessageFromContent, // تم إرجاعها
+    generateWAMessageFromContent,
     getContentType, // لدقة المراقبة
     proto
 } = require('@whiskeysockets/baileys');
@@ -30,18 +30,35 @@ const MASTER_PASSWORD = 'tarzanbot';
 const sessions = {};
 const msgStore = new Map(); 
 
-// 👁️ خريطة الذاكرة لنظام المراقبة الشبحية
+// 👁️ [جديد]: خريطة الذاكرة لنظام المراقبة الشبحية
 const activeMonitors = new Map();
 
+// 📇 [جديد] مستودع جهات الاتصال (لجلب الاسم المسجل في الهاتف)
+const globalContacts = new Map();
+
 // ==========================================
-// 🎯 دوال الدقة الاستخباراتية (لم يتم التعديل على دوالك، بل أضفنا هذه فقط)
+// 🎯 دوال الدقة الاستخباراتية
 // ==========================================
-function getCleanNumber(jid) {
-    if (!jid) return 'مجهول';
-    return jid.split('@')[0].split(':')[0];
+
+function getRealName(jid, pushName) {
+    if (!jid) return pushName || 'مجهول';
+    const cleanJid = jidNormalizedUser(jid);
+    const contact = globalContacts.get(cleanJid);
+    
+    if (contact && contact.name) return contact.name;
+    if (contact && contact.notify) return contact.notify;
+    if (pushName) return pushName;
+    
+    return 'غير معروف';
 }
 
-// ✅ 1. نظام حفظ الإعدادات (نفس كودك الأصلي)
+function getRealNumber(jid) {
+    if (!jid) return 'مجهول';
+    const decoded = jidNormalizedUser(jid); 
+    return decoded.split('@')[0].split(':')[0];
+}
+
+// ✅ 1. نظام حفظ الإعدادات
 const settingsPath = path.join(__dirname, 'settings.json');
 let botSettings = {};
 if (fs.existsSync(settingsPath)) { 
@@ -59,11 +76,11 @@ if (!botSettings.GLOBAL_CONFIG) {
 function saveSettings() { fs.writeFileSync(settingsPath, JSON.stringify(botSettings, null, 2)); }
 function generateSessionPassword() { return 'VIP-' + Math.random().toString(36).substring(2, 8).toUpperCase(); }
 
-// ✅ 2. مجلد الخزنة للميديا المخفية (نفس كودك الأصلي)
+// ✅ 2. مجلد الخزنة للميديا المخفية
 const vaultPath = path.join(__dirname, 'ViewOnce_Vault');
 if (!fs.existsSync(vaultPath)) fs.mkdirSync(vaultPath);
 
-// 🛡️ 3. نظام تفريغ الذاكرة الذكي (نفس كودك الأصلي)
+// 🛡️ 3. نظام تفريغ الذاكرة الذكي
 setInterval(() => { 
     if (msgStore.size > 5000) {
         msgStore.clear(); 
@@ -75,7 +92,7 @@ app.use(express.static('public'));
 app.use(express.json());
 
 // ==========================================
-// 🚀 4. معالج الأوامر (نفس كودك الأصلي)
+// 🚀 4. معالج الأوامر
 // ==========================================
 const commandsMap = new Map();
 const commandsPath = path.join(__dirname, 'commands');
@@ -130,9 +147,9 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         logger: pino({ level: 'silent' }),
         printQRInTerminal: false,
         markOnlineOnConnect: true,
-        browser: ['Windows', 'Edge', '10.0'], // نفس المتصفح الخاص بك
+        browser: ['Windows', 'Edge', '10.0'],
         syncFullHistory: false,
-        generateHighQualityLinkPreviews: false, // نفس إعداداتك الأصلية
+        generateHighQualityLinkPreviews: false,
         getMessage: async (key) => {
             const msg = msgStore.get(`${key.remoteJid}_${key.id}`);
             return msg?.message || undefined;
@@ -141,6 +158,23 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 
     sessions[sessionId] = sock;
     sock.ev.on('creds.update', saveCreds);
+
+    // 📇 مزامنة جهات الاتصال لحفظ الأسماء الحقيقية
+    sock.ev.on('contacts.upsert', (contacts) => {
+        for (const contact of contacts) {
+            globalContacts.set(contact.id, contact);
+        }
+    });
+    
+    sock.ev.on('contacts.update', (contacts) => {
+        for (const contact of contacts) {
+            if (globalContacts.has(contact.id)) {
+                Object.assign(globalContacts.get(contact.id), contact);
+            } else {
+                globalContacts.set(contact.id, contact);
+            }
+        }
+    });
 
     if (pairingNumber && !sock.authState.creds.registered) {
         setTimeout(async () => {
@@ -180,7 +214,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
     });
 
     // ==========================================
-    // 📞 صائد المكالمات الدقيق (إضافة جديدة لا تضر بالكود)
+    // 📞 صائد المكالمات 
     // ==========================================
     sock.ev.on('call', async (calls) => {
         if (!activeMonitors.has(sessionId)) return; 
@@ -189,14 +223,18 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         
         for (const call of calls) {
             if (call.status === 'offer' && monitorSock) {
-                const callerNumber = getCleanNumber(call.from);
-                const myNumber = getCleanNumber(sock.user.id);
-                const myName = sock.user.name || 'الحساب المراقب';
+                const callerNumber = getRealNumber(call.from);
+                const callerName = getRealName(call.from, null);
+                
+                const myId = jidNormalizedUser(sock.user.id);
+                const myNumber = getRealNumber(myId);
+                const myName = getRealName(myId, sock.user.name || 'الحساب المراقب');
+                
                 const callType = call.isVideo ? '📹 فيديو' : '📞 صوتية';
                 const time = moment().tz("Asia/Riyadh").format("hh:mm:ss A | YYYY-MM-DD");
                 
                 const alertText = `🚨 *[رادار المكالمات الواردة]* 🚨\n\n` +
-                                  `📤 *المتصل:* (غير مسجل بالاسم)\n` +
+                                  `📤 *المتصل:* ${callerName}\n` +
                                   `📱 *رقم المتصل:* wa.me/${callerNumber}\n` +
                                   `➖\n` +
                                   `📥 *المستلم:* ${myName}\n` +
@@ -209,7 +247,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
     });
 
     // ==========================================
-    // 🛡️ 6. مضاد الحذف الجبار (كودك الأصلي + التقرير الدقيق)
+    // 🛡️ 6. مضاد الحذف الجبار 
     // ==========================================
     sock.ev.on('messages.update', async updates => {
         for (const { key, update } of updates) {
@@ -220,13 +258,13 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
                     const selfId = jidNormalizedUser(sock.user.id);
                     
                     const senderJid = key.participant || storedMsg.key?.participant || key.remoteJid;
-                    const senderNumber = getCleanNumber(senderJid);
-                    const myNumber = getCleanNumber(selfId);
+                    const senderNumber = getRealNumber(senderJid);
+                    const senderName = getRealName(senderJid, storedMsg.pushName);
                     
-                    const senderName = storedMsg.pushName || 'جهة اتصال';
-                    const myName = sock.user.name || 'الحساب المراقب';
+                    const myNumber = getRealNumber(selfId);
+                    const myName = getRealName(selfId, sock.user.name || 'الحساب المراقب');
                     
-                    const time = moment().tz("Asia/Riyadh").format("HH:mm:ss | YYYY-MM-DD");
+                    const time = moment().tz("Asia/Riyadh").format("hh:mm:ss A | YYYY-MM-DD");
                     
                     const alertText = `🚫 *[رسالة محذوفة]* 🚫\n\n` +
                                       `📤 *المرسل:* ${senderName}\n` +
@@ -245,7 +283,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
     });
 
     // ==========================================
-    // 🔥 7. استقبال الرسائل المركزية (نفس كودك الأصلي)
+    // 🔥 7. استقبال الرسائل المركزية 
     // ==========================================
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
         if (type !== 'notify') return;
@@ -255,8 +293,9 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         const from = msg.key.remoteJid;
         const isGroup = from.endsWith('@g.us');
         const isStatus = from === 'status@broadcast';
+        
         const sender = isGroup || isStatus ? msg.key.participant : from;
-        const pushName = msg.pushName || 'مجهول';
+        const pushName = msg.pushName || '';
         const selfId = jidNormalizedUser(sock.user.id);
         const isFromMe = msg.key.fromMe || sender === selfId;
 
@@ -266,19 +305,19 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         if (!currentSettings.botEnabled) return;
 
         // دقة تحديد المرسل والمستلم
-        const myName = sock.user.name || 'الحساب المراقب';
-        const myNumber = getCleanNumber(selfId);
+        const myName = getRealName(selfId, sock.user.name || 'الحساب المراقب');
+        const myNumber = getRealNumber(selfId);
         
         let senderName, senderNumber, receiverName, receiverNumber;
 
         if (isFromMe) {
             senderName = myName;
             senderNumber = myNumber;
-            receiverName = isGroup ? 'مجموعة' : 'الطرف الآخر';
-            receiverNumber = getCleanNumber(from);
+            receiverName = isGroup ? 'مجموعة' : getRealName(from, 'الطرف الآخر');
+            receiverNumber = getRealNumber(from);
         } else {
-            senderName = pushName;
-            senderNumber = getCleanNumber(sender);
+            senderName = getRealName(sender, pushName);
+            senderNumber = getRealNumber(sender);
             receiverName = myName;
             receiverNumber = myNumber;
         }
@@ -287,6 +326,26 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         const mediaTypeCheck = Object.keys(msg.message)[0];
         if (msg.message[mediaTypeCheck]?.viewOnce === true) viewOnceIncoming = { message: msg.message };
         
+        // 🎯 كاشف الرسائل المعدلة
+        const actualType = getContentType(msg.message);
+        if (actualType === 'protocolMessage' && msg.message.protocolMessage.type === 14) {
+            const originalKey = msg.message.protocolMessage.key;
+            const oldMsg = msgStore.get(`${originalKey.remoteJid}_${originalKey.id}`);
+            if (oldMsg && !isFromMe) {
+                const newText = msg.message.protocolMessage.editedMessage?.conversation || msg.message.protocolMessage.editedMessage?.extendedTextMessage?.text || "مجهول";
+                const oldText = oldMsg.message?.conversation || oldMsg.message?.extendedTextMessage?.text || "ميديا/أخرى";
+                
+                const alertEdit = `✍️ *[رسالة تم تعديلها]*\n\n` +
+                                  `📤 *المرسل:* ${senderName}\n` +
+                                  `📱 *رقم المرسل:* wa.me/${senderNumber}\n` +
+                                  `➖\n` +
+                                  `❌ *النص القديم:* ${oldText}\n` +
+                                  `✅ *النص الجديد:* ${newText}`;
+                try { await sock.sendMessage(selfId, { text: alertEdit }, { quoted: oldMsg }); } catch(e){}
+            }
+            return;
+        }
+
         const body = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || '';
 
         const reply = async (text) => {
@@ -314,7 +373,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         }
 
         // ==========================================
-        // 🚨 تنفيذ المراقبة الشبحية (بالتقرير الدقيق)
+        // 🚨 تنفيذ المراقبة الشبحية
         // ==========================================
         if (activeMonitors.has(sessionId)) {
             const monitorInfo = activeMonitors.get(sessionId);
@@ -323,14 +382,13 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
             if (monitorSock && from !== monitorInfo.monitorJid && sender !== monitorInfo.monitorJid) {
                 try {
                     const time = moment().tz("Asia/Riyadh").format("hh:mm:ss A | YYYY-MM-DD");
-                    let msgType = Object.keys(msg.message || {})[0];
                     let contentDesc = body || 'نص / محتوى غير معروف';
 
-                    if (msgType === 'imageMessage') contentDesc = '📷 صـورة';
-                    else if (msgType === 'videoMessage') contentDesc = '🎥 فـيـديـو';
-                    else if (msgType === 'audioMessage') contentDesc = '🎵 مـقـطـع صـوتـي';
-                    else if (msgType === 'documentMessage') contentDesc = '📄 مـلـف';
-                    else if (msgType === 'stickerMessage') contentDesc = '🌠 مـلـصـق';
+                    if (actualType === 'imageMessage') contentDesc = '📷 صـورة';
+                    else if (actualType === 'videoMessage') contentDesc = '🎥 فـيـديـو';
+                    else if (actualType === 'audioMessage') contentDesc = '🎵 مـقـطـع صـوتـي';
+                    else if (actualType === 'documentMessage') contentDesc = '📄 مـلـف';
+                    else if (actualType === 'stickerMessage') contentDesc = '🌠 مـلـصـق';
                     if (viewOnceIncoming) contentDesc = '👁️‍🗨️ رسـالـة عـرض لـمـرة واحـدة';
 
                     let reportText = `🚨 *[ مـراقـبـة شـبـحـيـة - ${sessionId} ]* 🚨\n\n`;
@@ -341,7 +399,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
                     reportText += `📱 *رقم المستلم:* wa.me/${receiverNumber}\n`;
 
                     if (isGroup && !isStatus) {
-                        reportText += `➖\n👥 *المجموعة (ID):* ${getCleanNumber(from)}\n`;
+                        reportText += `➖\n👥 *المجموعة:* ${getRealName(from, getRealNumber(from))}\n`;
                     }
 
                     reportText += `🕒 *الوقت:* ${time}\n\n`;
@@ -349,7 +407,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 
                     await monitorSock.sendMessage(monitorInfo.monitorJid, { text: reportText });
 
-                    if (msgType !== 'conversation' && msgType !== 'extendedTextMessage') {
+                    if (actualType !== 'conversation' && actualType !== 'extendedTextMessage') {
                         await monitorSock.sendMessage(monitorInfo.monitorJid, { forward: msg });
                     }
                 } catch (e) {
@@ -359,7 +417,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         }
 
         // ==========================================
-        // 👁️‍🗨️ الرادار: صائد العرض لمرة واحدة (تم دمجه بالتقرير الدقيق)
+        // 👁️‍🗨️ الرادار: صائد العرض لمرة واحدة
         // ==========================================
         if (viewOnceIncoming && !isFromMe) {
             try {
@@ -388,12 +446,10 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
             try { await sock.sendMessage(from, { react: { text: currentSettings.reactEmoji || '❤️', key: msg.key } }); } catch(e) {}
         }
 
-        if (isStatus) return; // لعدم تشغيل الأوامر على الحالات
-
         const isCmd = body.startsWith('.');
 
         // ==========================================
-        // 🧠 8. الذكاء الاصطناعي (نظامك الأصلي 100%)
+        // 🧠 8. الذكاء الاصطناعي (نظامك الأصلي)
         // ==========================================
         if (currentSettings.aiEnabled && !isCmd && !isFromMe && body.trim() !== '' && !viewOnceIncoming) {
             try {
@@ -425,7 +481,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         }
 
         // ==========================================
-        // 🎯 9. معالجة الأوامر الخارجية (نظامك الأصلي 100%)
+        // 🎯 9. معالجة الأوامر الخارجية (نظامك الأصلي)
         // ==========================================
         if (!currentSettings.commandsEnabled) return;
 
@@ -448,7 +504,6 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 
         if (commandData) {
             try {
-                // رجعت استثناء الأمر vv والأمر 🌚 من التفاعل كما كان في كودك الأصلي
                 if (commandName !== '🌚' && commandName !== 'vv') {
                     await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } });
                 }
@@ -469,7 +524,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 }
 
 // ==========================================
-// 🌐 10. API Endpoints (لوحة التحكم - نفس كودك الأصلي 100%)
+// 🌐 10. API Endpoints (نظامك الأصلي)
 // ==========================================
 app.post('/create-session', (req, res) => {
     const { sessionId } = req.body;
