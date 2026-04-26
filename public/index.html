@@ -770,15 +770,15 @@
 
         <!-- شريط التنقل السفلي -->
         <nav class="bottom-nav">
-            <div class="nav-item active" onclick="switchPage('page-home')" id="nav-home">
+            <div class="nav-item active" onclick="switchPage('page-home', this)" id="nav-home">
                 <i class="fa-solid fa-house"></i>
                 <span>الرئيسية</span>
             </div>
-            <div class="nav-item" onclick="switchPage('page-connect')" id="nav-connect">
+            <div class="nav-item" onclick="switchPage('page-connect', this)" id="nav-connect">
                 <i class="fa-solid fa-qrcode"></i>
                 <span>الربط</span>
             </div>
-            <div class="nav-item" onclick="switchPage('page-settings')" id="nav-settings">
+            <div class="nav-item" onclick="switchPage('page-settings', this)" id="nav-settings">
                 <i class="fa-solid fa-shield-virus"></i>
                 <span>الترسانة</span>
             </div>
@@ -786,7 +786,6 @@
 
     </div>
 
-    <!-- المنطق البرمجي السلس وتأثيرات الطقس -->
     <script>
         // ==========================================
         // 🌸 تأثيرات المطر والورود
@@ -820,14 +819,16 @@
         // 💻 المتغيرات والدوال الأساسية
         // ==========================================
         let verifiedPassword = '';
-        let currentBadWords = []; // مصفوفة الكلمات الممنوعة الحالية
+        let currentBadWords = []; 
 
-        function switchPage(pageId) {
+        function switchPage(pageId, navElement) {
             document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
             document.getElementById(pageId).classList.add('active');
 
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            document.getElementById(pageId.replace('page-', 'nav-')).classList.add('active');
+            if(navElement) {
+                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                navElement.classList.add('active');
+            }
 
             if (pageId === 'page-settings') fetchSessions();
         }
@@ -1024,7 +1025,7 @@
                 document.getElementById('autoReactToggle').checked = data.autoReact;
                 document.getElementById('reactEmoji').value = data.reactEmoji || '💖';
 
-                // تعبئة الترسانة العسكرية
+                // تعبئة الترسانة العسكرية الدقيقة
                 document.getElementById('antiCallToggle').checked = data.antiCall || false;
                 document.getElementById('antiLinkToggle').checked = data.antiLink || false;
                 document.getElementById('antiSpamToggle').checked = data.antiSpam || false;
@@ -1034,7 +1035,7 @@
                 // الكلمات الممنوعة
                 document.getElementById('antiBadWordsToggle').checked = data.antiBadWords || false;
                 currentBadWords = data.badWordsList || ['كذاب', 'نصاب', 'حمار', 'كلب', 'غبي', 'قحبه', 'شرموط', 'ورع'];
-                toggleBadWordsUI(); // إظهار أو إخفاء القائمة
+                toggleBadWordsUI();
 
                 showToast('🔓 تم فك التشفير عن الترسانة');
             } catch (err) {
@@ -1045,6 +1046,7 @@
         async function saveSettings() {
             const sessionId = document.getElementById('activeSessions').value;
             
+            // 🌟 هنا يتم تجهيز جميع المتغيرات (بما فيها الحماية) لإرسالها للسيرفر
             const payload = {
                 sessionId, 
                 password: verifiedPassword,
@@ -1054,6 +1056,7 @@
                 autoReact: document.getElementById('autoReactToggle').checked,
                 reactEmoji: document.getElementById('reactEmoji').value.trim() || '💖',
                 
+                // أزرار الحماية
                 antiCall: document.getElementById('antiCallToggle').checked,
                 antiLink: document.getElementById('antiLinkToggle').checked,
                 antiSpam: document.getElementById('antiSpamToggle').checked,
@@ -1061,7 +1064,8 @@
                 antiBadWords: document.getElementById('antiBadWordsToggle').checked,
                 autoStatusSave: document.getElementById('autoStatusSaveToggle').checked,
                 
-                badWordsList: currentBadWords // إرسال المصفوفة المحدثة
+                // مصفوفة الكلمات
+                badWordsList: currentBadWords 
             };
 
             try {
