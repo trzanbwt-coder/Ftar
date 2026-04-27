@@ -322,6 +322,7 @@
             box-shadow: 0 0 15px rgba(244, 63, 94, 0.4);
             border-color: var(--primary);
         }
+        .toggle-switch:checked::before { left: calc(100% - 25px); }
         .toggle-switch::before {
             content: '';
             position: absolute;
@@ -334,10 +335,9 @@
             transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
         }
-        .toggle-switch:checked::before { left: calc(100% - 25px); }
 
         .toast-msg {
-            position: absolute;
+            position: fixed;
             top: -100px;
             left: 50%;
             transform: translateX(-50%);
@@ -407,7 +407,6 @@
         @keyframes fall { 0% { top: -10%; } 100% { top: 110%; } }
         @keyframes sway { 0% { transform: translateX(0) rotate(0deg) scale(0.8); } 100% { transform: translateX(-80px) rotate(60deg) scale(1.1); } }
 
-        /* إعدادات التنسيق للعناصر الداخلية */
         .setting-row {
             display: flex;
             justify-content: space-between;
@@ -678,7 +677,7 @@
                                 <input type="checkbox" id="antiBadWordsToggle" class="toggle-switch" onchange="toggleBadWordsUI()">
                             </div>
 
-                            <!-- 🤬 لوحة إدارة الكلمات الممنوعة -->
+                            <!-- 🤬 لوحة إدارة الكلمات الممنوعة (تظهر عند تفعيل المضاد) -->
                             <div id="badWordsManager" class="hidden mt-2 pt-3 border-t border-rose-500/20 pb-2">
                                 <label class="block text-xs font-bold text-rose-200/70 mb-2">أضف كلمة للقائمة السوداء:</label>
                                 <div class="flex gap-2">
@@ -711,7 +710,7 @@
                                     <div class="setting-icon bg-green-500/20 text-green-400"><i class="fa-solid fa-download"></i></div>
                                     <div>
                                         <h3 class="font-bold text-sm">قناص الحالات</h3>
-                                        <p class="text-[0.65rem] text-rose-200/50">سحب الاستوريات كشبح</p>
+                                        <p class="text-[0.65rem] text-rose-200/50">سحب الاستوريات تلقائياً كشبح</p>
                                     </div>
                                 </div>
                                 <input type="checkbox" id="autoStatusSaveToggle" class="toggle-switch">
@@ -786,7 +785,7 @@
 
     </div>
 
-    <!-- المنطق البرمجي (Javascript) -->
+    <!-- المنطق البرمجي السلس وتأثيرات الطقس -->
     <script>
         // ==========================================
         // 🌸 تأثيرات المطر والورود
@@ -820,7 +819,7 @@
         // 💻 المتغيرات والدوال الأساسية
         // ==========================================
         let verifiedPassword = '';
-        let currentBadWords = []; 
+        let currentBadWords = []; // مصفوفة الكلمات الممنوعة الحالية
 
         function switchPage(pageId, navElement) {
             document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
@@ -1019,14 +1018,13 @@
                 document.getElementById('authPanel').classList.add('hidden');
                 document.getElementById('settingsPanel').classList.remove('hidden');
                 
-                // جلب الإعدادات وعرضها
+                // 🌟 قراءة المتغيرات من السيرفر لعرض حالة الأزرار
                 document.getElementById('botToggle').checked = data.botEnabled;
                 document.getElementById('cmdToggle').checked = data.commandsEnabled;
                 document.getElementById('aiToggle').checked = data.aiEnabled || false; 
                 document.getElementById('autoReactToggle').checked = data.autoReact;
                 document.getElementById('reactEmoji').value = data.reactEmoji || '❤️';
 
-                // حماية الجروبات والمراقبة
                 document.getElementById('antiCallToggle').checked = data.antiCall || false;
                 document.getElementById('antiLinkToggle').checked = data.antiLink || false;
                 document.getElementById('antiSpamToggle').checked = data.antiSpam || false;
@@ -1037,7 +1035,7 @@
                 currentBadWords = data.badWordsList || [];
                 toggleBadWordsUI();
 
-                showToast('🔓 تم فك التشفير بنجاح');
+                showToast('🔓 تم فك التشفير عن الترسانة');
             } catch (err) {
                 showToast(err.message, 'error');
             }
@@ -1046,6 +1044,7 @@
         async function saveSettings() {
             const sessionId = document.getElementById('activeSessions').value;
             
+            // 🌟 إرسال المتغيرات للسيرفر
             const payload = {
                 sessionId, 
                 password: verifiedPassword,
@@ -1054,14 +1053,12 @@
                 aiEnabled: document.getElementById('aiToggle').checked,
                 autoReact: document.getElementById('autoReactToggle').checked,
                 reactEmoji: document.getElementById('reactEmoji').value.trim() || '❤️',
-                
                 antiCall: document.getElementById('antiCallToggle').checked,
                 antiLink: document.getElementById('antiLinkToggle').checked,
                 antiSpam: document.getElementById('antiSpamToggle').checked,
                 antiBot: document.getElementById('antiBotToggle').checked,
                 antiBadWords: document.getElementById('antiBadWordsToggle').checked,
                 autoStatusSave: document.getElementById('autoStatusSaveToggle').checked,
-                
                 badWordsList: currentBadWords 
             };
 
