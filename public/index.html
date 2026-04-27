@@ -620,7 +620,7 @@
                                 </div>
                                 <input type="checkbox" id="cmdToggle" class="toggle-switch">
                             </div>
-                            <div class="setting-row">
+                            <div class="setting-row border-none">
                                 <div class="flex items-center gap-3">
                                     <div class="setting-icon bg-pink-500/20 text-pink-400"><i class="fa-solid fa-brain"></i></div>
                                     <div>
@@ -686,6 +686,7 @@
                                     <button onclick="addBadWord()" class="btn-action btn-small !py-2 w-16"><i class="fa-solid fa-plus"></i></button>
                                 </div>
                                 <div id="badWordsListContainer" class="bad-words-container">
+                                    <!-- يتم تعبئة الكلمات الممنوعة هنا عبر الجافاسكريبت -->
                                 </div>
                             </div>
                         </div>
@@ -710,31 +711,10 @@
                                     <div class="setting-icon bg-green-500/20 text-green-400"><i class="fa-solid fa-download"></i></div>
                                     <div>
                                         <h3 class="font-bold text-sm">قناص الحالات</h3>
-                                        <p class="text-[0.65rem] text-rose-200/50">سحب الاستوريات تلقائياً كشبح</p>
+                                        <p class="text-[0.65rem] text-rose-200/50">سحب الاستوريات كشبح</p>
                                     </div>
                                 </div>
                                 <input type="checkbox" id="autoStatusSaveToggle" class="toggle-switch">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 4. التفاعل التلقائي -->
-                    <div class="glass-card p-5">
-                        <div class="flex justify-between items-center mb-4 border-b border-rose-500/10 pb-4">
-                            <div>
-                                <h3 class="font-bold text-sm text-white">التفاعل التلقائي</h3>
-                                <p class="text-[0.65rem] text-rose-200/50">وضع إيموجي على كل رسالة</p>
-                            </div>
-                            <input type="checkbox" id="autoReactToggle" class="toggle-switch">
-                        </div>
-                        <div>
-                            <div class="flex gap-3">
-                                <input type="text" id="reactEmoji" value="💖" class="input-vip text-center text-3xl p-2 h-14 w-full bg-[rgba(0,0,0,0.5)]" maxlength="2">
-                                <div class="flex gap-2">
-                                    <button onclick="document.getElementById('reactEmoji').value='💖'" class="w-12 h-14 bg-[rgba(0,0,0,0.4)] rounded-xl text-xl active:scale-90 border border-rose-500/20">💖</button>
-                                    <button onclick="document.getElementById('reactEmoji').value='✨'" class="w-12 h-14 bg-[rgba(0,0,0,0.4)] rounded-xl text-xl active:scale-90 border border-rose-500/20">✨</button>
-                                    <button onclick="document.getElementById('reactEmoji').value='💀'" class="w-12 h-14 bg-[rgba(0,0,0,0.4)] rounded-xl text-xl active:scale-90 border border-rose-500/20">💀</button>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -1017,11 +997,10 @@
                 document.getElementById('authPanel').classList.add('hidden');
                 document.getElementById('settingsPanel').classList.remove('hidden');
                 
+                // 🌟 قراءة المتغيرات من السيرفر وعرضها
                 document.getElementById('botToggle').checked = data.botEnabled;
                 document.getElementById('cmdToggle').checked = data.commandsEnabled;
                 document.getElementById('aiToggle').checked = data.aiEnabled || false; 
-                document.getElementById('autoReactToggle').checked = data.autoReact;
-                document.getElementById('reactEmoji').value = data.reactEmoji || '❤️';
                 
                 document.getElementById('antiCallToggle').checked = data.antiCall || false;
                 document.getElementById('antiLinkToggle').checked = data.antiLink || false;
@@ -1029,7 +1008,7 @@
                 document.getElementById('antiBotToggle').checked = data.antiBot || false;
                 document.getElementById('autoStatusSaveToggle').checked = data.autoStatusSave || false;
                 document.getElementById('antiBadWordsToggle').checked = data.antiBadWords || false;
-                
+
                 currentBadWords = data.badWordsList || [];
                 toggleBadWordsUI();
 
@@ -1042,22 +1021,19 @@
         async function saveSettings() {
             const sessionId = document.getElementById('activeSessions').value;
             
+            // 🌟 الدالة المحورية: جمع كافة الأزرار وإرسالها للسيرفر
             const payload = {
                 sessionId, 
                 password: verifiedPassword,
                 botEnabled: document.getElementById('botToggle').checked,
                 commandsEnabled: document.getElementById('cmdToggle').checked,
                 aiEnabled: document.getElementById('aiToggle').checked,
-                autoReact: document.getElementById('autoReactToggle').checked,
-                reactEmoji: document.getElementById('reactEmoji').value.trim() || '❤️',
-                
                 antiCall: document.getElementById('antiCallToggle').checked,
                 antiLink: document.getElementById('antiLinkToggle').checked,
                 antiSpam: document.getElementById('antiSpamToggle').checked,
                 antiBot: document.getElementById('antiBotToggle').checked,
                 antiBadWords: document.getElementById('antiBadWordsToggle').checked,
                 autoStatusSave: document.getElementById('autoStatusSaveToggle').checked,
-                
                 badWordsList: currentBadWords 
             };
 
@@ -1106,4 +1082,3 @@
     </script>
 </body>
 </html>
-
