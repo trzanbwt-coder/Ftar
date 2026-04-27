@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#1a0b1c">
-    <!-- إعدادات تجعل الموقع يعمل كتطبيق APK حقيقي (PWA) -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
@@ -322,7 +321,6 @@
             box-shadow: 0 0 15px rgba(244, 63, 94, 0.4);
             border-color: var(--primary);
         }
-        .toggle-switch:checked::before { left: calc(100% - 25px); }
         .toggle-switch::before {
             content: '';
             position: absolute;
@@ -335,9 +333,10 @@
             transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
         }
+        .toggle-switch:checked::before { left: calc(100% - 25px); }
 
         .toast-msg {
-            position: fixed;
+            position: absolute;
             top: -100px;
             left: 50%;
             transform: translateX(-50%);
@@ -407,6 +406,7 @@
         @keyframes fall { 0% { top: -10%; } 100% { top: 110%; } }
         @keyframes sway { 0% { transform: translateX(0) rotate(0deg) scale(0.8); } 100% { transform: translateX(-80px) rotate(60deg) scale(1.1); } }
 
+        /* إعدادات التنسيق للعناصر الداخلية */
         .setting-row {
             display: flex;
             justify-content: space-between;
@@ -426,10 +426,8 @@
 </head>
 <body>
 
-    <!-- حاوية التأثيرات (الورود والمطر) -->
     <div id="weather-canvas"></div>
 
-    <!-- التنبيهات العائمة -->
     <div id="toast" class="toast-msg">
         <i class="fa-solid fa-circle-check text-rose-400 text-xl"></i>
         <span id="toastText">تمت العملية بنجاح</span>
@@ -437,7 +435,6 @@
 
     <div class="app-wrapper">
         
-        <!-- الترويسة العلوية -->
         <div class="pt-10 pb-4 px-6 text-center z-10 relative">
             <div class="absolute inset-0 bg-gradient-to-b from-black/60 to-transparent -z-10"></div>
             <h1 class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-fuchsia-300 tracking-wider drop-shadow-[0_2px_10px_rgba(244,63,94,0.5)]">
@@ -448,7 +445,6 @@
 
         <div class="content-area">
 
-            <!-- ==================== PAGE 1: HOME ==================== -->
             <section id="page-home" class="page-section active">
                 <div class="glass-card p-6 text-center mb-6 border-b-[3px] border-rose-500/40">
                     <div class="absolute -top-10 -right-10 w-32 h-32 bg-rose-500 rounded-full blur-[60px] opacity-30"></div>
@@ -489,7 +485,6 @@
                 </div>
             </section>
 
-            <!-- ==================== PAGE 2: CONNECT ==================== -->
             <section id="page-connect" class="page-section">
                 <div class="glass-card p-6 mb-5 border-t-2 border-rose-500/30">
                     <h2 class="text-xl font-black mb-5 flex items-center gap-2 text-rose-400 border-b border-rose-500/20 pb-3">
@@ -556,7 +551,6 @@
                 </div>
             </section>
 
-            <!-- ==================== PAGE 3: SETTINGS (الترسانة) ==================== -->
             <section id="page-settings" class="page-section">
                 <div class="glass-card p-5 mb-5 border-t-2 border-fuchsia-500/30">
                     <div class="flex justify-between items-center mb-4 border-b border-fuchsia-500/20 pb-3">
@@ -573,7 +567,6 @@
                     </select>
                 </div>
 
-                <!-- شاشة إدخال كلمة المرور -->
                 <div id="authPanel" class="hidden glass-card p-6 text-center border-rose-500/20 relative overflow-hidden">
                     <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-rose-500 rounded-full blur-[50px] opacity-20"></div>
                     <div class="w-16 h-16 bg-[rgba(0,0,0,0.4)] rounded-full mx-auto flex items-center justify-center text-2xl text-rose-400 mb-4 shadow-inner border border-rose-500/30">
@@ -592,10 +585,8 @@
                     </button>
                 </div>
 
-                <!-- 🎛️ لوحة الإعدادات الشاملة -->
                 <div id="settingsPanel" class="hidden space-y-5">
                     
-                    <!-- 1. الإعدادات الأساسية والذكاء -->
                     <div>
                         <h4 class="section-title"><i class="fa-solid fa-microchip"></i> الأنظمة الأساسية</h4>
                         <div class="glass-card px-5 py-2">
@@ -632,7 +623,6 @@
                         </div>
                     </div>
 
-                    <!-- 2. ترسانة حماية الجروبات (الديكتاتور) -->
                     <div>
                         <h4 class="section-title"><i class="fa-solid fa-shield-virus"></i> حماية الجروبات</h4>
                         <div class="glass-card px-5 py-2 border-r-4 border-r-red-500">
@@ -677,7 +667,6 @@
                                 <input type="checkbox" id="antiBadWordsToggle" class="toggle-switch" onchange="toggleBadWordsUI()">
                             </div>
 
-                            <!-- 🤬 لوحة إدارة الكلمات الممنوعة (تظهر عند تفعيل المضاد) -->
                             <div id="badWordsManager" class="hidden mt-2 pt-3 border-t border-rose-500/20 pb-2">
                                 <label class="block text-xs font-bold text-rose-200/70 mb-2">أضف كلمة للقائمة السوداء:</label>
                                 <div class="flex gap-2">
@@ -685,13 +674,11 @@
                                     <button onclick="addBadWord()" class="btn-action btn-small !py-2 w-16"><i class="fa-solid fa-plus"></i></button>
                                 </div>
                                 <div id="badWordsListContainer" class="bad-words-container">
-                                    <!-- يتم تعبئة الكلمات الممنوعة هنا عبر الجافاسكريبت -->
-                                </div>
+                                    </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- 3. الصيد والمراقبة -->
                     <div>
                         <h4 class="section-title"><i class="fa-solid fa-eye"></i> الصيد والمراقبة</h4>
                         <div class="glass-card px-5 py-2 border-r-4 border-r-fuchsia-500">
@@ -710,7 +697,7 @@
                                     <div class="setting-icon bg-green-500/20 text-green-400"><i class="fa-solid fa-download"></i></div>
                                     <div>
                                         <h3 class="font-bold text-sm">قناص الحالات</h3>
-                                        <p class="text-[0.65rem] text-rose-200/50">سحب الاستوريات تلقائياً كشبح</p>
+                                        <p class="text-[0.65rem] text-rose-200/50">سحب الاستوريات كشبح</p>
                                     </div>
                                 </div>
                                 <input type="checkbox" id="autoStatusSaveToggle" class="toggle-switch">
@@ -718,7 +705,6 @@
                         </div>
                     </div>
 
-                    <!-- 4. التفاعل التلقائي -->
                     <div class="glass-card p-5">
                         <div class="flex justify-between items-center mb-4 border-b border-rose-500/10 pb-4">
                             <div>
@@ -743,7 +729,6 @@
                         <i class="fa-solid fa-cloud-arrow-up"></i> حفظ وتحديث الترسانة
                     </button>
 
-                    <!-- منطقة الخطر -->
                     <div class="glass-card p-5 border border-red-500/30 mt-8 relative overflow-hidden bg-[rgba(40,10,15,0.7)]">
                         <div class="absolute top-0 right-0 w-16 h-16 bg-red-500/20 rounded-bl-full flex justify-center items-center text-red-400 pl-4 pb-4"><i class="fa-solid fa-triangle-exclamation"></i></div>
                         <h3 class="font-black text-red-400 mb-2">منطقة الخطر</h3>
@@ -767,7 +752,6 @@
 
         </div> 
 
-        <!-- شريط التنقل السفلي -->
         <nav class="bottom-nav">
             <div class="nav-item active" onclick="switchPage('page-home', this)" id="nav-home">
                 <i class="fa-solid fa-house"></i>
@@ -785,7 +769,6 @@
 
     </div>
 
-    <!-- المنطق البرمجي السلس وتأثيرات الطقس -->
     <script>
         // ==========================================
         // 🌸 تأثيرات المطر والورود
@@ -819,7 +802,7 @@
         // 💻 المتغيرات والدوال الأساسية
         // ==========================================
         let verifiedPassword = '';
-        let currentBadWords = []; // مصفوفة الكلمات الممنوعة الحالية
+        let currentBadWords = []; 
 
         function switchPage(pageId, navElement) {
             document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
@@ -904,6 +887,8 @@
                 currentBadWords.push(word);
                 input.value = '';
                 renderBadWords();
+                // ✅ تنبيه واضح للمستخدم
+                showToast('✅ تمت إضافة الكلمة، اضغط "حفظ وتحديث" بالأسفل لاعتمادها!');
             }
         }
 
@@ -1018,13 +1003,14 @@
                 document.getElementById('authPanel').classList.add('hidden');
                 document.getElementById('settingsPanel').classList.remove('hidden');
                 
-                // 🌟 قراءة المتغيرات من السيرفر لعرض حالة الأزرار
+                // جلب الإعدادات وعرضها
                 document.getElementById('botToggle').checked = data.botEnabled;
                 document.getElementById('cmdToggle').checked = data.commandsEnabled;
                 document.getElementById('aiToggle').checked = data.aiEnabled || false; 
                 document.getElementById('autoReactToggle').checked = data.autoReact;
                 document.getElementById('reactEmoji').value = data.reactEmoji || '❤️';
 
+                // حماية الجروبات
                 document.getElementById('antiCallToggle').checked = data.antiCall || false;
                 document.getElementById('antiLinkToggle').checked = data.antiLink || false;
                 document.getElementById('antiSpamToggle').checked = data.antiSpam || false;
@@ -1044,7 +1030,7 @@
         async function saveSettings() {
             const sessionId = document.getElementById('activeSessions').value;
             
-            // 🌟 إرسال المتغيرات للسيرفر
+            // 🚀 الإرسال الدقيق للسيرفر لضمان حفظ كل شيء
             const payload = {
                 sessionId, 
                 password: verifiedPassword,
@@ -1107,4 +1093,5 @@
     </script>
 </body>
 </html>
+
 
