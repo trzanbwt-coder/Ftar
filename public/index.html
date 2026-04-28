@@ -21,7 +21,7 @@
         }
         
         body {
-            font-family: 'Cairo', sans-serif;
+            font-family:  Cairo , sans-serif;
             background-color: var(--dark-bg);
             background-image: 
                 radial-gradient(circle at 15% 20%, rgba(244, 63, 94, 0.15), transparent 40%),
@@ -134,7 +134,7 @@
         }
         
         .nav-item::after {
-            content: '';
+            content:   ;
             position: absolute;
             bottom: 12px;
             width: 5px;
@@ -252,7 +252,7 @@
             border-color: var(--primary);
         }
         .toggle-switch::before {
-            content: '';
+            content:   ;
             position: absolute;
             width: 24px;
             height: 24px;
@@ -264,6 +264,32 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
         }
         .toggle-switch:checked::before { left: calc(100% - 27px); }
+
+        /* نظام الفقاعاتChips المطور للكلمات الممنوعة */
+        .chips-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        .chip {
+            background: rgba(244, 63, 94, 0.2);
+            border: 1px solid rgba(244, 63, 94, 0.4);
+            color: #fda4af;
+            padding: 0.4rem 0.8rem;
+            border-radius: 2rem;
+            font-size: 0.8rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            animation: fadeInScale 0.3s ease;
+        }
+        .chip i {
+            cursor: pointer;
+            color: #f43f5e;
+            font-size: 0.9rem;
+        }
 
         .toast-msg {
             position: absolute;
@@ -385,14 +411,14 @@
                 </div>
 
                 <div class="grid grid-cols-2 gap-4 mb-4">
-                    <div class="glass-card p-5 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition border-b-2 border-rose-500/50" onclick="switchPage('page-connect')">
+                    <div class="glass-card p-5 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition border-b-2 border-rose-500/50" onclick="switchPage( page-connect )">
                         <div class="w-14 h-14 rounded-2xl bg-rose-500/10 text-rose-400 flex items-center justify-center text-2xl mb-3 border border-rose-500/20 shadow-inner">
                             <i class="fa-solid fa-plug-circle-plus"></i>
                         </div>
                         <h3 class="font-bold text-sm">ربط حساب</h3>
                     </div>
                     
-                    <div class="glass-card p-5 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition border-b-2 border-fuchsia-500/50" onclick="switchPage('page-settings')">
+                    <div class="glass-card p-5 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition border-b-2 border-fuchsia-500/50" onclick="switchPage( page-settings )">
                         <div class="w-14 h-14 rounded-2xl bg-fuchsia-500/10 text-fuchsia-400 flex items-center justify-center text-2xl mb-3 border border-fuchsia-500/20 shadow-inner">
                             <i class="fa-solid fa-sliders"></i>
                         </div>
@@ -558,38 +584,74 @@
                         </div>
                     </div>
 
-                    <!-- 🛡️ قسم الحماية المطور الجديد 🆕 -->
-                    <div class="glass-card p-5 border-r-4 border-r-amber-500 bg-amber-900/10">
-                        <h3 class="font-black text-amber-400 text-sm mb-4 border-b border-amber-500/20 pb-2">أنظمة حماية القروبات</h3>
-                        
+                    <!-- 🛡️ قسم الحماية المطور الجديد (إسكات مكالمات وسحب ستوري) 🆕 -->
+                    <div class="glass-card p-5 border-r-4 border-r-amber-500 bg-amber-900/10 relative overflow-hidden">
+                        <h3 class="font-black text-amber-400 text-sm mb-4 border-b border-amber-500/20 pb-2 flex items-center gap-2">
+                             <i class="fa-solid fa-shield-halved"></i> أنظمة الحماية الملكية
+                        </h3>
+
+                        <!-- زر إسكات المكالمات -->
                         <div class="flex justify-between items-center mb-4 border-b border-white/5 pb-4">
-                            <div>
-                                <h3 class="font-bold text-sm">حماية الروابط</h3>
-                                <p class="text-[0.6rem] text-amber-200/40">حذف أي رابط يتم إرساله</p>
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400"><i class="fa-solid fa-phone-slash"></i></div>
+                                <div>
+                                    <h3 class="font-bold text-sm text-white">إسكات المكالمات 🔇</h3>
+                                    <p class="text-[0.6rem] text-amber-200/40">رفض تلقائي للمكالمات المزعجة</p>
+                                </div>
                             </div>
+                            <input type="checkbox" id="antiCallToggle" class="toggle-switch">
+                        </div>
+
+                        <!-- زر سحب الستوري -->
+                        <div class="flex justify-between items-center mb-4 border-b border-white/5 pb-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400"><i class="fa-solid fa-cloud-arrow-down"></i></div>
+                                <div>
+                                    <h3 class="font-bold text-sm text-white">سحب الستوري 📥</h3>
+                                    <p class="text-[0.6rem] text-amber-200/40">سحب حالات الأصدقاء فوراً للخاص</p>
+                                </div>
+                            </div>
+                            <input type="checkbox" id="statusStealerToggle" class="toggle-switch">
+                        </div>
+
+                        <!-- الأزرار السابقة -->
+                        <div class="flex justify-between items-center mb-4 border-b border-white/5 pb-4">
+                            <h3 class="font-bold text-sm">حماية الروابط</h3>
                             <input type="checkbox" id="antiLinkToggle" class="toggle-switch">
                         </div>
 
-                        <div class="flex justify-between items-center mb-4 border-b border-white/5 pb-4">
-                            <div>
-                                <h3 class="font-bold text-sm">مراقبة السبام</h3>
-                                <p class="text-[0.6rem] text-amber-200/40">منع تكرار الرسائل المزعجة</p>
-                            </div>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-sm">مراقبة السبام</h3>
                             <input type="checkbox" id="antiSpamToggle" class="toggle-switch">
                         </div>
+                    </div>
 
+                    <!-- 🛡️ تطوير نظام الكلمات الممنوعة 🆕 -->
+                    <div class="glass-card p-5 border-r-4 border-r-fuchsia-500 bg-fuchsia-900/10">
+                        <h3 class="font-black text-fuchsia-400 text-sm mb-4 border-b border-fuchsia-500/20 pb-2">منع الكلمات البذيئة</h3>
+                        
                         <div class="flex justify-between items-center mb-4">
-                            <div>
-                                <h3 class="font-bold text-sm">منع الكلمات البذيئة</h3>
-                                <p class="text-[0.6rem] text-amber-200/40">حذف الرسائل التي تحتوي سب</p>
-                            </div>
+                            <h3 class="font-bold text-sm">تفعيل نظام المنع</h3>
                             <input type="checkbox" id="antiBadWordsToggle" class="toggle-switch">
                         </div>
 
-                        <div class="mt-4">
-                            <label class="block text-[0.7rem] font-bold text-amber-200/60 mb-2">قائمة الكلمات الممنوعة (افصل بفاصلة):</label>
-                            <textarea id="badWordsList" class="input-vip h-20 pt-2 resize-none text-xs" placeholder="مثال: سب، شتم، كلمة1، كلمة2"></textarea>
+                        <div class="space-y-3">
+                            <label class="block text-[0.7rem] font-bold text-fuchsia-200/60 pl-2">أضف كلمة جديدة للمنع:</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="newBadWordInput" placeholder="اكتب الكلمة هنا..." class="input-vip flex-1 text-xs py-3">
+                                <button onclick="addNewBadWord()" class="btn-action px-4 py-2 text-sm shadow-none">
+                                    <i class="fa-solid fa-plus"></i>
+                                </button>
+                            </div>
                         </div>
+
+                        <!-- حاوية الكلمات المضافة (Chips) -->
+                        <div id="badWordsChips" class="chips-container">
+                            <!-- سيتم توليد الكلمات هنا برمجياً -->
+                        </div>
+                        
+                        <!-- الحقل القديم مخفي للحفاظ على التوافق مع السيرفر دون حذف حرف -->
+                        <textarea id="badWordsList" class="hidden"></textarea>
                     </div>
 
                     <!-- إعدادات التفاعل -->
@@ -607,9 +669,9 @@
                             <div class="flex gap-3">
                                 <input type="text" id="reactEmoji" value="💖" class="input-vip text-center text-3xl p-2 h-14 w-full bg-[rgba(0,0,0,0.5)]" maxlength="2">
                                 <div class="flex gap-2">
-                                    <button onclick="document.getElementById('reactEmoji').value='💖'" class="w-12 h-14 bg-[rgba(0,0,0,0.4)] rounded-xl text-xl active:scale-90 transition border border-rose-500/20 shadow-inner">💖</button>
-                                    <button onclick="document.getElementById('reactEmoji').value='✨'" class="w-12 h-14 bg-[rgba(0,0,0,0.4)] rounded-xl text-xl active:scale-90 transition border border-rose-500/20 shadow-inner">✨</button>
-                                    <button onclick="document.getElementById('reactEmoji').value='👑'" class="w-12 h-14 bg-[rgba(0,0,0,0.4)] rounded-xl text-xl active:scale-90 transition border border-rose-500/20 shadow-inner">👑</button>
+                                    <button onclick="document.getElementById( 'reactEmoji' ).value= '💖' " class="w-12 h-14 bg-[rgba(0,0,0,0.4)] rounded-xl text-xl active:scale-90 transition border border-rose-500/20 shadow-inner">💖</button>
+                                    <button onclick="document.getElementById( 'reactEmoji' ).value= '✨' " class="w-12 h-14 bg-[rgba(0,0,0,0.4)] rounded-xl text-xl active:scale-90 transition border border-rose-500/20 shadow-inner">✨</button>
+                                    <button onclick="document.getElementById( 'reactEmoji' ).value= '👑' " class="w-12 h-14 bg-[rgba(0,0,0,0.4)] rounded-xl text-xl active:scale-90 transition border border-rose-500/20 shadow-inner">👑</button>
                                 </div>
                             </div>
                         </div>
@@ -646,15 +708,15 @@
 
         <!-- شريط التنقل السفلي -->
         <nav class="bottom-nav">
-            <div class="nav-item active" onclick="switchPage('page-home')" id="nav-home">
+            <div class="nav-item active" onclick="switchPage( 'page-home' )" id="nav-home">
                 <i class="fa-solid fa-house"></i>
                 <span>الرئيسية</span>
             </div>
-            <div class="nav-item" onclick="switchPage('page-connect')" id="nav-connect">
+            <div class="nav-item" onclick="switchPage( 'page-connect' )" id="nav-connect">
                 <i class="fa-solid fa-qrcode"></i>
                 <span>الربط</span>
             </div>
-            <div class="nav-item" onclick="switchPage('page-settings')" id="nav-settings">
+            <div class="nav-item" onclick="switchPage( 'page-settings' )" id="nav-settings">
                 <i class="fa-solid fa-wand-magic-sparkles"></i>
                 <span>الإعدادات</span>
             </div>
@@ -668,146 +730,179 @@
         // 🌸 نظام التأثيرات (المطر والورود)
         // ==========================================
         function initWeatherEffects() {
-            const container = document.getElementById('weather-canvas');
+            const container = document.getElementById( 'weather-canvas' );
             
             // 1. إنشاء قطرات المطر المائلة (الرياح)
             for(let i = 0; i < 40; i++) {
-                let drop = document.createElement('div');
-                drop.className = 'raindrop';
-                drop.style.left = (Math.random() * 150 - 25) + 'vw'; 
-                drop.style.animationDuration = (Math.random() * 0.6 + 0.4) + 's';
-                drop.style.animationDelay = (Math.random() * 2) + 's';
+                let drop = document.createElement( 'div' );
+                drop.className =  'raindrop' ;
+                drop.style.left = (Math.random() * 150 - 25) +  'vw' ; 
+                drop.style.animationDuration = (Math.random() * 0.6 + 0.4) +  's' ;
+                drop.style.animationDelay = (Math.random() * 2) +  's' ;
                 drop.style.opacity = Math.random() * 0.5 + 0.1;
                 container.appendChild(drop);
             }
 
             // 2. إنشاء بتلات الورد المتساقطة
             for(let i = 0; i < 25; i++) {
-                let petal = document.createElement('div');
-                petal.className = Math.random() > 0.5 ? 'petal dark' : 'petal';
-                petal.style.left = (Math.random() * 120 - 10) + 'vw';
-                let size = (Math.random() * 12 + 8) + 'px';
+                let petal = document.createElement( 'div' );
+                petal.className = Math.random() > 0.5 ?  'petal dark'  :  'petal' ;
+                petal.style.left = (Math.random() * 120 - 10) +  'vw' ;
+                let size = (Math.random() * 12 + 8) +  'px' ;
                 petal.style.width = size;
                 petal.style.height = size;
-                petal.style.animationDuration = (Math.random() * 4 + 4) + 's';
-                petal.style.animationDelay = (Math.random() * 5) + 's';
+                petal.style.animationDuration = (Math.random() * 4 + 4) +  's' ;
+                petal.style.animationDelay = (Math.random() * 5) +  's' ;
                 container.appendChild(petal);
             }
         }
         // تشغيل الطقس عند تحميل الصفحة
-        window.addEventListener('DOMContentLoaded', initWeatherEffects);
+        window.addEventListener( 'DOMContentLoaded' , initWeatherEffects);
 
         // ==========================================
         // 💻 منطق لوحة التحكم والتطبيقات
         // ==========================================
-        let verifiedPassword = '';
+        let verifiedPassword =   '';
+        let currentBadWords = []; // لتخزين الكلمات الممنوعة محلياً
 
         function switchPage(pageId) {
-            document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
-            document.getElementById(pageId).classList.add('active');
+            document.querySelectorAll( '.page-section' ).forEach(p => p.classList.remove( 'active' ));
+            document.getElementById(pageId).classList.add( 'active' );
 
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            document.getElementById(pageId.replace('page-','nav-')).classList.add('active');
+            document.querySelectorAll( '.nav-item' ).forEach(n => n.classList.remove( 'active' ));
+            document.getElementById(pageId.replace( 'page-' , 'nav-' )).classList.add( 'active' );
 
-            if (pageId === 'page-settings') fetchSessions();
+            if (pageId ===  'page-settings' ) fetchSessions();
         }
 
-        function showToast(message, type = 'success') {
-            const toast = document.getElementById('toast');
-            const icon = toast.querySelector('i');
-            document.getElementById('toastText').textContent = message;
+        function showToast(message, type =  'success' ) {
+            const toast = document.getElementById( 'toast' );
+            const icon = toast.querySelector( 'i' );
+            document.getElementById( 'toastText' ).textContent = message;
             
-            toast.className = `toast-msg show ${type === 'error' ? 'error' : ''}`;
-            icon.className = type === 'error' ? 'fa-solid fa-circle-exclamation text-red-400 text-xl' : 'fa-solid fa-circle-check text-rose-400 text-xl';
+            toast.className = `toast-msg show ${type ===  'error'  ?  'error'  :   ''}`;
+            icon.className = type ===  'error'  ?  'fa-solid fa-circle-exclamation text-red-400 text-xl'  :  'fa-solid fa-circle-check text-rose-400 text-xl' ;
 
-            setTimeout(() => toast.classList.remove('show'), 3500);
+            setTimeout(() => toast.classList.remove( 'show' ), 3500);
         }
 
         function showLoader() {
-            document.getElementById('displayArea').classList.remove('hidden');
-            document.getElementById('displayArea').style.display = 'flex';
-            document.getElementById('loading').classList.remove('hidden');
-            document.getElementById('loading').style.display = 'flex';
-            document.getElementById('codeResult').classList.add('hidden');
-            document.getElementById('qrResult').classList.add('hidden');
+            document.getElementById( 'displayArea' ).classList.remove( 'hidden' );
+            document.getElementById( 'displayArea' ).style.display =  'flex' ;
+            document.getElementById( 'loading' ).classList.remove( 'hidden' );
+            document.getElementById( 'loading' ).style.display =  'flex' ;
+            document.getElementById( 'codeResult' ).classList.add( 'hidden' );
+            document.getElementById( 'qrResult' ).classList.add( 'hidden' );
         }
 
         // 🌟 دالة نسخ الكود بأمان
         function copyCode() {
-            const codeText = document.getElementById('theCode').textContent;
+            const codeText = document.getElementById( 'theCode' ).textContent;
             const tempInput = document.createElement("textarea");
             tempInput.value = codeText;
             document.body.appendChild(tempInput);
             tempInput.select();
             try {
                 document.execCommand("copy");
-                showToast('💖 تم نسخ الكود بنجاح!');
+                showToast( '💖 تم نسخ الكود بنجاح!' );
             } catch (err) {
-                showToast('فشل النسخ، يرجى النسخ يدوياً', 'error');
+                showToast( 'فشل النسخ، يرجى النسخ يدوياً' ,  'error' );
             }
             document.body.removeChild(tempInput);
         }
 
+        // 🆕 دالة إدارة الكلمات الممنوعة (Tags/Chips)
+        function renderBadWords() {
+            const container = document.getElementById('badWordsChips');
+            const hiddenTextarea = document.getElementById('badWordsList');
+            container.innerHTML = '';
+            
+            currentBadWords.forEach((word, index) => {
+                const chip = document.createElement('div');
+                chip.className = 'chip';
+                chip.innerHTML = `${word} <i class="fa-solid fa-circle-xmark" onclick="removeBadWord(${index})"></i>`;
+                container.appendChild(chip);
+            });
+            
+            hiddenTextarea.value = currentBadWords.join(',');
+        }
+
+        function addNewBadWord() {
+            const input = document.getElementById('newBadWordInput');
+            const word = input.value.trim();
+            if (word && !currentBadWords.includes(word)) {
+                currentBadWords.push(word);
+                input.value = '';
+                renderBadWords();
+                showToast('تمت إضافة الكلمة للقائمة');
+            }
+        }
+
+        function removeBadWord(index) {
+            currentBadWords.splice(index, 1);
+            renderBadWords();
+        }
+
         async function requestPairCode() {
-            const sessionId = document.getElementById('sessionId').value.trim();
-            const number = document.getElementById('phoneNumber').value.trim();
-            if (!sessionId || !number) return showToast('أكملي البيانات المطلوبة يا أميرة', 'error');
+            const sessionId = document.getElementById( 'sessionId' ).value.trim();
+            const number = document.getElementById( 'phoneNumber' ).value.trim();
+            if (!sessionId || !number) return showToast( 'أكملي البيانات المطلوبة يا أميرة' ,  'error' );
 
             showLoader();
             try {
-                const res = await fetch('/pair', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                const res = await fetch( '/pair' , {
+                    method:  'POST' ,
+                    headers: {  'Content-Type' :  'application/json'  },
                     body: JSON.stringify({ sessionId, number })
                 });
                 const data = await res.json();
-                document.getElementById('loading').classList.add('hidden');
+                document.getElementById( 'loading' ).classList.add( 'hidden' );
                 
                 if (data.pairingCode) {
-                    document.getElementById('theCode').textContent = data.pairingCode;
-                    document.getElementById('codeResult').classList.remove('hidden');
-                    document.getElementById('codeResult').style.display = 'flex';
-                    showToast('تم استخراج الكود! شيكي الواتساب 💖');
+                    document.getElementById( 'theCode' ).textContent = data.pairingCode;
+                    document.getElementById( 'codeResult' ).classList.remove( 'hidden' );
+                    document.getElementById( 'codeResult' ).style.display =  'flex' ;
+                    showToast( 'تم استخراج الكود! شيكي الواتساب 💖' );
                 } else throw new Error(data.error);
             } catch (err) {
-                document.getElementById('displayArea').classList.add('hidden');
-                showToast(err.message || 'خطأ في الاتصال بالخوادم', 'error');
+                document.getElementById( 'displayArea' ).classList.add( 'hidden' );
+                showToast(err.message ||  'خطأ في الاتصال بالخوادم' ,  'error' );
             }
         }
 
         async function createSessionQR() {
-            const sessionId = document.getElementById('sessionId').value.trim();
-            if (!sessionId) return showToast('أدخلي اسم الجلسة', 'error');
+            const sessionId = document.getElementById( 'sessionId' ).value.trim();
+            if (!sessionId) return showToast( 'أدخلي اسم الجلسة' ,  'error' );
 
             showLoader();
             try {
-                const res = await fetch('/create-session', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                const res = await fetch( '/create-session' , {
+                    method:  'POST' ,
+                    headers: {  'Content-Type' :  'application/json'  },
                     body: JSON.stringify({ sessionId })
                 });
                 const data = await res.json();
-                document.getElementById('loading').classList.add('hidden');
+                document.getElementById( 'loading' ).classList.add( 'hidden' );
 
                 if (data.qr) {
-                    document.getElementById('theQr').src = data.qr;
-                    document.getElementById('qrResult').classList.remove('hidden');
-                    document.getElementById('qrResult').style.display = 'flex';
-                    showToast('تم توليد الباركود بنجاح 🌸');
+                    document.getElementById( 'theQr' ).src = data.qr;
+                    document.getElementById( 'qrResult' ).classList.remove( 'hidden' );
+                    document.getElementById( 'qrResult' ).style.display =  'flex' ;
+                    showToast( 'تم توليد الباركود بنجاح 🌸' );
                 } else throw new Error(data.error);
             } catch (err) {
-                document.getElementById('displayArea').classList.add('hidden');
-                showToast(err.message || 'خطأ في الاتصال', 'error');
+                document.getElementById( 'displayArea' ).classList.add( 'hidden' );
+                showToast(err.message ||  'خطأ في الاتصال' ,  'error' );
             }
         }
 
         async function fetchSessions() {
             try {
-                const res = await fetch('/sessions');
+                const res = await fetch( '/sessions' );
                 const data = await res.json();
-                const select = document.getElementById('activeSessions');
+                const select = document.getElementById( 'activeSessions' );
                 const current = select.value;
-                select.innerHTML = '<option value="">-- اختاري الجلسة من هنا --</option>';
+                select.innerHTML =  '<option value="">-- اختاري الجلسة من هنا --</option>' ;
                 data.sessions.forEach(s => select.innerHTML += `<option value="${s}">${s}</option>`);
                 if(data.sessions.includes(current)) select.value = current;
                 else showAuthPanel(); 
@@ -815,101 +910,115 @@
         }
 
         function showAuthPanel() {
-            verifiedPassword = ''; 
-            const sessionId = document.getElementById('activeSessions').value;
-            document.getElementById('settingsPanel').classList.add('hidden');
-            document.getElementById('sessionPassword').value = '';
+            verifiedPassword =   ''; 
+            const sessionId = document.getElementById( 'activeSessions' ).value;
+            document.getElementById( 'settingsPanel' ).classList.add( 'hidden' );
+            document.getElementById( 'sessionPassword' ).value =   '';
             if (!sessionId) {
-                document.getElementById('authPanel').classList.add('hidden');
-                document.getElementById('noSessionMsg').classList.remove('hidden');
+                document.getElementById( 'authPanel' ).classList.add( 'hidden' );
+                document.getElementById( 'noSessionMsg' ).classList.remove( 'hidden' );
             } else {
-                document.getElementById('noSessionMsg').classList.add('hidden');
-                document.getElementById('authPanel').classList.remove('hidden');
+                document.getElementById( 'noSessionMsg' ).classList.add( 'hidden' );
+                document.getElementById( 'authPanel' ).classList.remove( 'hidden' );
             }
         }
 
         async function unlockSettings() {
-            const sessionId = document.getElementById('activeSessions').value;
-            const password = document.getElementById('sessionPassword').value.trim();
-            if (!password) return showToast('يرجى إدخال كلمة المرور', 'error');
+            const sessionId = document.getElementById( 'activeSessions' ).value;
+            const password = document.getElementById( 'sessionPassword' ).value.trim();
+            if (!password) return showToast( 'يرجى إدخال كلمة المرور' ,  'error' );
 
             try {
-                const res = await fetch('/api/settings/get', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                const res = await fetch( '/api/settings/get' , {
+                    method:  'POST' ,
+                    headers: {  'Content-Type' :  'application/json'  },
                     body: JSON.stringify({ sessionId, password })
                 });
                 const data = await res.json();
                 if (data.error) throw new Error(data.error);
 
                 verifiedPassword = password;
-                document.getElementById('authPanel').classList.add('hidden');
-                document.getElementById('settingsPanel').classList.remove('hidden');
+                document.getElementById( 'authPanel' ).classList.add( 'hidden' );
+                document.getElementById( 'settingsPanel' ).classList.remove( 'hidden' );
                 
                 // تعبئة البيانات (بما فيها الحماية الجديدة) 🆕
-                document.getElementById('botToggle').checked = data.botEnabled;
-                document.getElementById('cmdToggle').checked = data.commandsEnabled;
-                document.getElementById('aiToggle').checked = data.aiEnabled || false;
-                document.getElementById('antiLinkToggle').checked = data.antiLink || false;
-                document.getElementById('antiSpamToggle').checked = data.antiSpam || false;
-                document.getElementById('antiBadWordsToggle').checked = data.antiBadWords || false;
-                document.getElementById('badWordsList').value = Array.isArray(data.badWordsList) ? data.badWordsList.join(', ') : (data.badWordsList || '');
-                document.getElementById('autoReactToggle').checked = data.autoReact;
-                document.getElementById('reactEmoji').value = data.reactEmoji || '💖';
+                document.getElementById( 'botToggle' ).checked = data.botEnabled;
+                document.getElementById( 'cmdToggle' ).checked = data.commandsEnabled;
+                document.getElementById( 'aiToggle' ).checked = data.aiEnabled || false;
+                
+                // الميزات الجديدة 🆕
+                document.getElementById( 'antiCallToggle' ).checked = data.antiCall || false;
+                document.getElementById( 'statusStealerToggle' ).checked = data.statusStealer || false;
+                
+                document.getElementById( 'antiLinkToggle' ).checked = data.antiLink || false;
+                document.getElementById( 'antiSpamToggle' ).checked = data.antiSpam || false;
+                document.getElementById( 'antiBadWordsToggle' ).checked = data.antiBadWords || false;
+                
+                // نظام الكلمات الممنوعة المطور
+                currentBadWords = Array.isArray(data.badWordsList) ? data.badWordsList : (data.badWordsList ? data.badWordsList.split(',') : []);
+                renderBadWords();
 
-                showToast('🔓 تم فتح لوحة التحكم يا أميرة');
+                document.getElementById( 'autoReactToggle' ).checked = data.autoReact;
+                document.getElementById( 'reactEmoji' ).value = data.reactEmoji ||  '💖' ;
+
+                showToast( '🔓 تم فتح لوحة التحكم يا أميرة' );
             } catch (err) {
-                showToast(err.message, 'error');
+                showToast(err.message,  'error' );
             }
         }
 
         async function saveSettings() {
-            const sessionId = document.getElementById('activeSessions').value;
+            const sessionId = document.getElementById( 'activeSessions' ).value;
             try {
-                const res = await fetch('/api/settings/save', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                const res = await fetch( '/api/settings/save' , {
+                    method:  'POST' ,
+                    headers: {  'Content-Type' :  'application/json'  },
                     body: JSON.stringify({ 
                         sessionId, 
                         password: verifiedPassword,
-                        botEnabled: document.getElementById('botToggle').checked,
-                        commandsEnabled: document.getElementById('cmdToggle').checked,
-                        aiEnabled: document.getElementById('aiToggle').checked,
-                        antiLink: document.getElementById('antiLinkToggle').checked,
-                        antiSpam: document.getElementById('antiSpamToggle').checked,
-                        antiBadWords: document.getElementById('antiBadWordsToggle').checked,
-                        badWordsList: document.getElementById('badWordsList').value,
-                        autoReact: document.getElementById('autoReactToggle').checked, 
-                        reactEmoji: document.getElementById('reactEmoji').value.trim() || '💖'
+                        botEnabled: document.getElementById( 'botToggle' ).checked,
+                        commandsEnabled: document.getElementById( 'cmdToggle' ).checked,
+                        aiEnabled: document.getElementById( 'aiToggle' ).checked,
+                        
+                        // حفظ الميزات الجديدة 🆕
+                        antiCall: document.getElementById( 'antiCallToggle' ).checked,
+                        statusStealer: document.getElementById( 'statusStealerToggle' ).checked,
+                        
+                        antiLink: document.getElementById( 'antiLinkToggle' ).checked,
+                        antiSpam: document.getElementById( 'antiSpamToggle' ).checked,
+                        antiBadWords: document.getElementById( 'antiBadWordsToggle' ).checked,
+                        badWordsList: currentBadWords, // إرسال المصفوفة الجديدة
+                        autoReact: document.getElementById( 'autoReactToggle' ).checked, 
+                        reactEmoji: document.getElementById( 'reactEmoji' ).value.trim() ||  '💖' 
                     })
                 });
                 const data = await res.json();
-                if (data.success) showToast('✨ تم حفظ التعديلات بنجاح');
+                if (data.success) showToast( '✨ تم حفظ الإعدادات الملكية بنجاح' );
                 else throw new Error(data.error);
             } catch (err) {
-                showToast(err.message || 'فشل الحفظ', 'error');
+                showToast(err.message ||  'فشل الحفظ' ,  'error' );
             }
         }
 
         async function deleteSession() {
-            const sessionId = document.getElementById('activeSessions').value;
-            const password = document.getElementById('masterPassword').value.trim();
-            if(!password) return showToast('أدخلي كلمة المرور الرئيسية أولاً', 'error');
-            if(confirm('⚠️ هل أنتِ متأكدة من حذف الجلسة؟')) {
+            const sessionId = document.getElementById( 'activeSessions' ).value;
+            const password = document.getElementById( 'masterPassword' ).value.trim();
+            if(!password) return showToast( 'أدخلي كلمة المرور الرئيسية أولاً' ,  'error' );
+            if(confirm( '⚠️ هل أنتِ متأكدة من حذف الجلسة؟' )) {
                 try {
-                    const res = await fetch('/delete-session', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                    const res = await fetch( '/delete-session' , {
+                        method:  'POST' ,
+                        headers: {  'Content-Type' :  'application/json'  },
                         body: JSON.stringify({ sessionId, password })
                     });
                     const data = await res.json();
                     if(data.message) {
-                        showToast('تم الحذف بنجاح 🗑️');
-                        document.getElementById('masterPassword').value = '';
+                        showToast( 'تم الحذف بنجاح 🗑️' );
+                        document.getElementById( 'masterPassword' ).value =   '';
                         fetchSessions();
                         showAuthPanel();
                     } else throw new Error(data.error);
-                } catch(err) { showToast(err.message || 'خطأ في الحذف', 'error'); }
+                } catch(err) { showToast(err.message ||  'خطأ في الحذف' ,  'error' ); }
             }
         }
 
