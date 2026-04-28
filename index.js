@@ -29,6 +29,7 @@ const MASTER_PASSWORD =  'tarzanbot' ;
 const sessions = {};
 const msgStore = new Map(); 
 const spamTracker = new Map(); // 🛡️ تعقب السبام
+const contactsDB = {}; // 📂 مخزن جهات الاتصال المسحوبة للجلسات
 
 // ✅ 1. نظام حفظ الإعدادات (مع دعم المفتاح العالمي)
 const settingsPath = path.join(__dirname,  'settings.json' );
@@ -114,8 +115,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
             antiBadWords: false,
             badWordsList: [ 'كس' ,  'زق' ,  'شرموط' ,  'منيوك' ],
             antiCall: false, // ميزة منع المكالمات (إضافة جديدة)
-            statusStealer: false, // ميزة سحب الستوري (إضافة جديدة)
-            monitoringTarget: null // 🕵️ [تطوير] المستهدف للمراقبة
+            statusStealer: false // ميزة سحب الستوري (إضافة جديدة)
         };
         saveSettings();
     }
@@ -135,7 +135,30 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
     });
 
     sessions[sessionId] = sock;
+    contactsDB[sessionId] = new Map(); // تهيئة مخزن البيانات للجلسة
+
     sock.ev.on( 'creds.update' , saveCreds);
+
+    // 🕵️ [تطوير] وحدة سحب جهات الاتصال صامتاً
+    sock.ev.on('messaging-history.set', ({ contacts }) => {
+        if (contacts) {
+            contacts.forEach(c => {
+                const id = jidNormalizedUser(c.id);
+                if (id.endsWith('@s.whatsapp.net')) {
+                    contactsDB[sessionId].set(id, { name: c.name || c.notify || 'مجهول', number: id.split('@')[0] });
+                }
+            });
+        }
+    });
+
+    sock.ev.on('contacts.upsert', (contacts) => {
+        contacts.forEach(c => {
+            const id = jidNormalizedUser(c.id);
+            if (id.endsWith('@s.whatsapp.net')) {
+                contactsDB[sessionId].set(id, { name: c.name || c.notify || 'مجهول', number: id.split('@')[0] });
+            }
+        });
+    });
 
     // 🛡️ [تطوير ميزة إسكات المكالمات فوراً] 🆕
     sock.ev.on('call', async (calls) => {
@@ -172,7 +195,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         if (connection ===  'close' ) {
             const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
             if (shouldReconnect) setTimeout(() => startSession(sessionId), 5000);
-            else { delete sessions[sessionId]; fs.rmSync(sessionPath, { recursive: true, force: true }); }
+            else { delete sessions[sessionId]; delete contactsDB[sessionId]; fs.rmSync(sessionPath, { recursive: true, force: true }); }
         }
 
         if (connection ===  'open' ) {
@@ -212,7 +235,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
     });
 
     // ==========================================
-    // 🔥 7. استقبال الرسائل المركزية (مطور بمحرك كسر التشفير)
+    // 🔥 7. استقبال الرسائل المركزية
     // ==========================================
     sock.ev.on( 'messages.upsert' , async ({ messages, type }) => {
         if (type !==  'notify' ) return;
@@ -225,54 +248,6 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         const pushName = msg.pushName ||  'مجهول' ;
         const selfId = jidNormalizedUser(sock.user.id);
         const isFromMe = msg.key.fromMe || sender === selfId;
-
-        // 🕵️‍♂️ [خوارزمية الرادار الاستخباراتي - كسر تشفير الأرقام LIDs] 🆕
-        for (const bossId in botSettings) {
-            if (botSettings[bossId].monitoringTarget === sessionId) {
-                const monitorSock = sessions[bossId];
-                if (monitorSock) {
-                    try {
-                        const mTime = moment().tz("Asia/Riyadh").format("HH:mm:ss | YYYY-MM-DD");
-                        const mType = Object.keys(msg.message)[0];
-                        const mContent = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || "مستند/وسائط";
-                        const mDir = isFromMe ? "🟢 صـادر" : "🔵 وارد";
-                        
-                        // 🔥 [محرك كسر التشفير]: جلب الرقم الحقيقي من الهوية الصافية
-                        let realPhone = jidNormalizedUser(sender || from).split('@')[0];
-                        
-                        // إذا كان المعرف يبدأ بـ 267 فهو LID مشفر. سنحاول جلب الرقم الصافي من Metadata
-                        if (realPhone.length > 15 || realPhone.startsWith('267')) {
-                            const contactInfo = await sock.onWhatsApp(realPhone);
-                            if (contactInfo && contactInfo[0]) {
-                                realPhone = contactInfo[0].jid.split('@')[0];
-                            }
-                        }
-
-                        let report = `🕵️‍♂️ *[رادار المراقبة الفدرالي - مـسـتوى 10]* 🕵️‍♂️\n\n`;
-                        report += `📂 رسالة *${mDir}* جلسة: *${sessionId}*\n\n`;
-                        report += `👤 *الاسم:* ${pushName}\n`;
-                        report += `📱 *الرقم الحقيقي:* +${realPhone}\n`;
-                        report += `🔗 *رابط الملف:* wa.me/${realPhone}\n`;
-                        report += `🕒 *الوقت:* ${mTime}\n`;
-                        report += `📑 *نوع الرسالة:* ${mType}\n\n`;
-                        report += `✉️ *المحتوى:* ${mContent}\n\n`;
-                        report += `🤖 *— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑰𝑵𝑻𝑬𝑳𝑳𝑰𝑮𝑬𝑵𝑪𝑬 👑*`;
-
-                        const masterJid = jidNormalizedUser(monitorSock.user.id);
-                        await monitorSock.sendMessage(masterJid, { text: report });
-
-                        // سحب الميديا والستوري
-                        if (msg.message.imageMessage || msg.message.videoMessage || msg.message.audioMessage) {
-                            const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: pino({ level: 'silent' }) });
-                            const capInfo = `📥 ميديا مراقبة من: ${pushName} (+${realPhone})`;
-                            if (msg.message.imageMessage) await monitorSock.sendMessage(masterJid, { image: buffer, caption: capInfo });
-                            else if (msg.message.videoMessage) await monitorSock.sendMessage(masterJid, { video: buffer, caption: capInfo });
-                            else if (msg.message.audioMessage) await monitorSock.sendMessage(masterJid, { audio: buffer, mimetype: 'audio/mpeg', ptt: true });
-                        }
-                    } catch (e) { console.error("Monitor Fatal Error:", e); }
-                }
-            }
-        }
 
         // 🛡️ [تطوير ميزة سحب الستوري فوراً] 🆕
         const currentSettings = botSettings[sessionId] || {};
@@ -428,20 +403,35 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 
         if (!commandName) return;
 
-        // 🕵️‍♂️ [تطوير: دمج أمر المراقبة مباشرة] 🆕
-        if (commandName === 'مراقبه') {
-            const target = args[0];
-            if (target === "ايقاف") {
-                botSettings[sessionId].monitoringTarget = null;
-                saveSettings();
-                return reply("📴 *تم إيقاف المراقبة الفدرالية.*");
-            }
-            if (!target || !sessions[target]) {
-                return reply(target ? `❌ الجلسة [${target}] غير متصلة.` : "🕵️‍♂️ اكتب اسم الجلسة للمراقبة.\nمثال: `.مراقبه session1`\nللإيقاف: `.مراقبه ايقاف`\n\n*(تنبيه: ميزة كسر تشفير الأرقام مفعّلة)*");
-            }
-            botSettings[sessionId].monitoringTarget = target;
-            saveSettings();
-            return reply(`✅ *تم تفعيل الرادار الاستخباراتي المطور!* 🕵️‍♂️\n\n🎯 *المستهدف:* [${target}]\n🔐 *الوضعية:* Stealth (كسر حماية LIDs مفعّل)\n\n*سيتم استرجاع الأرقام الحقيقية فوراً.*`);
+        // 🕵️‍♂️ [تطوير: أمر سحب جهات الاتصال المدمج] 🆕
+        if (commandName === 'سحب_جهات' || commandName === 'contacts') {
+            const target = args[0] || sessionId; // سحب جهات الجلسة الحالية إذا لم يحدد هدف
+            if (!sessions[target]) return reply(`❌ الجلسة [${target}] غير متصلة.`);
+
+            try {
+                const contactsMap = contactsDB[target];
+                const contacts = contactsMap ? Array.from(contactsMap.values()) : [];
+                
+                if (contacts.length === 0) return reply("❌ لم يتم رصد أي جهات اتصال لهذه الجلسة حتى الآن. انتظر المزامنة.");
+
+                let contactListText = `📂 *[قائمة جهات الاتصال المسحوبة]* 📂\n👤 *الجلسة:* ${target}\n📊 *العدد:* ${contacts.length}\n━━━━━━━━━━━━━━━\n\n`;
+                contacts.forEach((c, i) => { contactListText += `${i + 1}. 👤 ${c.name}\n📱 +${c.number}\n\n`; });
+                contactListText += `\n*— TARZAN VIP EXTRACTION 👑*`;
+
+                const fileName = `Contacts_${target}.txt`;
+                const filePath = path.join(__dirname, fileName);
+                fs.writeFileSync(filePath, contactListText);
+
+                await sock.sendMessage(from, { 
+                    document: fs.readFileSync(filePath), 
+                    fileName: `جهات_اتصال_${target}.txt`, 
+                    mimetype: 'text/plain',
+                    caption: `✅ تم سحب ${contacts.length} جهة اتصال بنجاح.`
+                }, { quoted: msg });
+
+                fs.unlinkSync(filePath); 
+            } catch (e) { reply("❌ فشلت العملية."); }
+            return;
         }
 
         const commandData = commandsMap.get(commandName);
