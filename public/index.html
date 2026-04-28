@@ -558,6 +558,40 @@
                         </div>
                     </div>
 
+                    <!-- 🛡️ قسم الحماية المطور الجديد 🆕 -->
+                    <div class="glass-card p-5 border-r-4 border-r-amber-500 bg-amber-900/10">
+                        <h3 class="font-black text-amber-400 text-sm mb-4 border-b border-amber-500/20 pb-2">أنظمة حماية القروبات</h3>
+                        
+                        <div class="flex justify-between items-center mb-4 border-b border-white/5 pb-4">
+                            <div>
+                                <h3 class="font-bold text-sm">حماية الروابط</h3>
+                                <p class="text-[0.6rem] text-amber-200/40">حذف أي رابط يتم إرساله</p>
+                            </div>
+                            <input type="checkbox" id="antiLinkToggle" class="toggle-switch">
+                        </div>
+
+                        <div class="flex justify-between items-center mb-4 border-b border-white/5 pb-4">
+                            <div>
+                                <h3 class="font-bold text-sm">مراقبة السبام</h3>
+                                <p class="text-[0.6rem] text-amber-200/40">منع تكرار الرسائل المزعجة</p>
+                            </div>
+                            <input type="checkbox" id="antiSpamToggle" class="toggle-switch">
+                        </div>
+
+                        <div class="flex justify-between items-center mb-4">
+                            <div>
+                                <h3 class="font-bold text-sm">منع الكلمات البذيئة</h3>
+                                <p class="text-[0.6rem] text-amber-200/40">حذف الرسائل التي تحتوي سب</p>
+                            </div>
+                            <input type="checkbox" id="antiBadWordsToggle" class="toggle-switch">
+                        </div>
+
+                        <div class="mt-4">
+                            <label class="block text-[0.7rem] font-bold text-amber-200/60 mb-2">قائمة الكلمات الممنوعة (افصل بفاصلة):</label>
+                            <textarea id="badWordsList" class="input-vip h-20 pt-2 resize-none text-xs" placeholder="مثال: سب، شتم، كلمة1، كلمة2"></textarea>
+                        </div>
+                    </div>
+
                     <!-- إعدادات التفاعل -->
                     <div class="glass-card p-5">
                         <div class="flex justify-between items-center mb-4 border-b border-rose-500/10 pb-4">
@@ -636,13 +670,12 @@
         function initWeatherEffects() {
             const container = document.getElementById('weather-canvas');
             
-            // 1. إنشاء قطرات المطر המائلة (الرياح)
+            // 1. إنشاء قطرات المطر المائلة (الرياح)
             for(let i = 0; i < 40; i++) {
                 let drop = document.createElement('div');
                 drop.className = 'raindrop';
-                // توزيع عشوائي أوسع لتغطية الشاشة رغم ميلان الرياح
                 drop.style.left = (Math.random() * 150 - 25) + 'vw'; 
-                drop.style.animationDuration = (Math.random() * 0.6 + 0.4) + 's'; // سرعة المطر
+                drop.style.animationDuration = (Math.random() * 0.6 + 0.4) + 's';
                 drop.style.animationDelay = (Math.random() * 2) + 's';
                 drop.style.opacity = Math.random() * 0.5 + 0.1;
                 container.appendChild(drop);
@@ -651,12 +684,12 @@
             // 2. إنشاء بتلات الورد المتساقطة
             for(let i = 0; i < 25; i++) {
                 let petal = document.createElement('div');
-                petal.className = Math.random() > 0.5 ? 'petal dark' : 'petal'; // لونين للبتلات
+                petal.className = Math.random() > 0.5 ? 'petal dark' : 'petal';
                 petal.style.left = (Math.random() * 120 - 10) + 'vw';
                 let size = (Math.random() * 12 + 8) + 'px';
                 petal.style.width = size;
                 petal.style.height = size;
-                petal.style.animationDuration = (Math.random() * 4 + 4) + 's'; // سقوط بطيء وناعم
+                petal.style.animationDuration = (Math.random() * 4 + 4) + 's';
                 petal.style.animationDelay = (Math.random() * 5) + 's';
                 container.appendChild(petal);
             }
@@ -674,7 +707,7 @@
             document.getElementById(pageId).classList.add('active');
 
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            document.getElementById(pageId.replace('page-', 'nav-')).classList.add('active');
+            document.getElementById(pageId.replace('page-','nav-')).classList.add('active');
 
             if (pageId === 'page-settings') fetchSessions();
         }
@@ -702,20 +735,16 @@
         // 🌟 دالة نسخ الكود بأمان
         function copyCode() {
             const codeText = document.getElementById('theCode').textContent;
-            
-            // إنشاء عنصر مؤقت للنسخ (طريقة آمنة جداً وتعمل داخل أي متصفح/إطار)
             const tempInput = document.createElement("textarea");
             tempInput.value = codeText;
             document.body.appendChild(tempInput);
             tempInput.select();
-            
             try {
                 document.execCommand("copy");
                 showToast('💖 تم نسخ الكود بنجاح!');
             } catch (err) {
                 showToast('فشل النسخ، يرجى النسخ يدوياً', 'error');
             }
-            
             document.body.removeChild(tempInput);
         }
 
@@ -788,10 +817,8 @@
         function showAuthPanel() {
             verifiedPassword = ''; 
             const sessionId = document.getElementById('activeSessions').value;
-            
             document.getElementById('settingsPanel').classList.add('hidden');
             document.getElementById('sessionPassword').value = '';
-
             if (!sessionId) {
                 document.getElementById('authPanel').classList.add('hidden');
                 document.getElementById('noSessionMsg').classList.remove('hidden');
@@ -804,7 +831,6 @@
         async function unlockSettings() {
             const sessionId = document.getElementById('activeSessions').value;
             const password = document.getElementById('sessionPassword').value.trim();
-
             if (!password) return showToast('يرجى إدخال كلمة المرور', 'error');
 
             try {
@@ -814,18 +840,20 @@
                     body: JSON.stringify({ sessionId, password })
                 });
                 const data = await res.json();
-                
                 if (data.error) throw new Error(data.error);
 
                 verifiedPassword = password;
-
                 document.getElementById('authPanel').classList.add('hidden');
                 document.getElementById('settingsPanel').classList.remove('hidden');
                 
-                // تعبئة البيانات (بما فيها الذكاء الاصطناعي الجديد)
+                // تعبئة البيانات (بما فيها الحماية الجديدة) 🆕
                 document.getElementById('botToggle').checked = data.botEnabled;
                 document.getElementById('cmdToggle').checked = data.commandsEnabled;
-                document.getElementById('aiToggle').checked = data.aiEnabled || false; // تفعيل الذكاء
+                document.getElementById('aiToggle').checked = data.aiEnabled || false;
+                document.getElementById('antiLinkToggle').checked = data.antiLink || false;
+                document.getElementById('antiSpamToggle').checked = data.antiSpam || false;
+                document.getElementById('antiBadWordsToggle').checked = data.antiBadWords || false;
+                document.getElementById('badWordsList').value = Array.isArray(data.badWordsList) ? data.badWordsList.join(', ') : (data.badWordsList || '');
                 document.getElementById('autoReactToggle').checked = data.autoReact;
                 document.getElementById('reactEmoji').value = data.reactEmoji || '💖';
 
@@ -837,12 +865,6 @@
 
         async function saveSettings() {
             const sessionId = document.getElementById('activeSessions').value;
-            const botEnabled = document.getElementById('botToggle').checked;
-            const commandsEnabled = document.getElementById('cmdToggle').checked;
-            const aiEnabled = document.getElementById('aiToggle').checked; // حفظ حالة الذكاء
-            const autoReact = document.getElementById('autoReactToggle').checked;
-            const reactEmoji = document.getElementById('reactEmoji').value.trim() || '💖';
-
             try {
                 const res = await fetch('/api/settings/save', {
                     method: 'POST',
@@ -850,11 +872,15 @@
                     body: JSON.stringify({ 
                         sessionId, 
                         password: verifiedPassword,
-                        botEnabled,
-                        commandsEnabled,
-                        aiEnabled, // إرسال حالة الذكاء للسيرفر
-                        autoReact, 
-                        reactEmoji 
+                        botEnabled: document.getElementById('botToggle').checked,
+                        commandsEnabled: document.getElementById('cmdToggle').checked,
+                        aiEnabled: document.getElementById('aiToggle').checked,
+                        antiLink: document.getElementById('antiLinkToggle').checked,
+                        antiSpam: document.getElementById('antiSpamToggle').checked,
+                        antiBadWords: document.getElementById('antiBadWordsToggle').checked,
+                        badWordsList: document.getElementById('badWordsList').value,
+                        autoReact: document.getElementById('autoReactToggle').checked, 
+                        reactEmoji: document.getElementById('reactEmoji').value.trim() || '💖'
                     })
                 });
                 const data = await res.json();
@@ -868,10 +894,8 @@
         async function deleteSession() {
             const sessionId = document.getElementById('activeSessions').value;
             const password = document.getElementById('masterPassword').value.trim();
-
             if(!password) return showToast('أدخلي كلمة المرور الرئيسية أولاً', 'error');
-
-            if(confirm('⚠️ هل أنتِ متأكدة من حذف الجلسة نهائياً؟ لا يمكن التراجع عن هذا الإجراء.')) {
+            if(confirm('⚠️ هل أنتِ متأكدة من حذف الجلسة؟')) {
                 try {
                     const res = await fetch('/delete-session', {
                         method: 'POST',
@@ -879,16 +903,13 @@
                         body: JSON.stringify({ sessionId, password })
                     });
                     const data = await res.json();
-                    
                     if(data.message) {
                         showToast('تم الحذف بنجاح 🗑️');
                         document.getElementById('masterPassword').value = '';
                         fetchSessions();
                         showAuthPanel();
                     } else throw new Error(data.error);
-                } catch(err) {
-                    showToast(err.message || 'خطأ في الحذف', 'error');
-                }
+                } catch(err) { showToast(err.message || 'خطأ في الحذف', 'error'); }
             }
         }
 
