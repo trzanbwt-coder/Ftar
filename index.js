@@ -28,6 +28,7 @@ const PORT = process.env.PORT || 10000;
 const MASTER_PASSWORD = 'tarzanbot'; 
 const sessions = {};
 const msgStore = new Map(); 
+const spamTracker = new Map(); // 🛡️ تعقب السبام
 
 // ✅ 1. نظام حفظ الإعدادات (مع دعم المفتاح العالمي)
 const settingsPath = path.join(__dirname, 'settings.json');
@@ -58,6 +59,7 @@ setInterval(() => {
         msgStore.clear(); 
         console.log('🧹 [حماية السيرفر] تم تفريغ الذاكرة المؤقتة للرسائل لمنع اختناق الرام');
     }
+    spamTracker.clear(); // تنظيف سجل السبام دورياً
 }, 30 * 60 * 1000);
 
 app.use(express.static('public'));
@@ -105,7 +107,12 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
             aiEnabled: false, 
             autoReact: false, 
             reactEmoji: '❤️', 
-            welcomeSent: false
+            welcomeSent: false,
+            // 🆕 إعدادات الحماية الجديدة
+            antiLink: false,
+            antiSpam: false,
+            antiBadWords: false,
+            badWordsList: ['كس', 'زق', 'شرموط', 'منيوك'] 
         };
         saveSettings();
     }
@@ -208,6 +215,56 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         const currentSettings = botSettings[sessionId] || {};
         if (!currentSettings.botEnabled) return;
 
+        // 🛡️ [نظام الحماية المطور] 🆕
+        const body = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || '';
+        
+        if (isGroup && !isFromMe) {
+            // التحقق من الصلاحيات (يجب أن يكون البوت مشرفاً ليتمكن من الحذف)
+            let isAdmin = false;
+            let botIsAdmin = false;
+            try {
+                const groupMetadata = await sock.groupMetadata(from);
+                const participants = groupMetadata.participants;
+                isAdmin = participants.find(p => p.id === sender)?.admin !== null;
+                botIsAdmin = participants.find(p => p.id === selfId)?.admin !== null;
+            } catch (e) {}
+
+            if (!isAdmin && botIsAdmin) {
+                // 1. مضاد الروابط
+                if (currentSettings.antiLink && (body.includes('http://') || body.includes('https://') || body.includes('chat.whatsapp.com'))) {
+                    await sock.sendMessage(from, { delete: msg.key });
+                    await sock.sendMessage(from, { text: `🚫 @${sender.split('@')[0]} ممنوع إرسال الروابط في هذا القروب!`, mentions: [sender] });
+                    return;
+                }
+
+                // 2. مضاد السبام (الرسائل المتكررة بسرعة)
+                if (currentSettings.antiSpam) {
+                    const now = Date.now();
+                    const userSpam = spamTracker.get(sender) || { count: 0, last: 0 };
+                    if (now - userSpam.last < 2000) { // أقل من ثانيتين
+                        userSpam.count++;
+                        if (userSpam.count > 4) { // أكثر من 4 رسائل
+                            await sock.sendMessage(from, { delete: msg.key });
+                            if (userSpam.count === 5) await sock.sendMessage(from, { text: `⚠️ @${sender.split('@')[0]} توقف عن التكرار (سبام)!`, mentions: [sender] });
+                            return;
+                        }
+                    } else { userSpam.count = 1; }
+                    userSpam.last = now;
+                    spamTracker.set(sender, userSpam);
+                }
+
+                // 3. منع الكلمات الممنوعة
+                if (currentSettings.antiBadWords && currentSettings.badWordsList) {
+                    const hasBadWord = currentSettings.badWordsList.some(word => body.toLowerCase().includes(word.toLowerCase()));
+                    if (hasBadWord) {
+                        await sock.sendMessage(from, { delete: msg.key });
+                        await sock.sendMessage(from, { text: `🚫 @${sender.split('@')[0]} عذراً، هذه الكلمة ممنوعة هنا!`, mentions: [sender] });
+                        return;
+                    }
+                }
+            }
+        }
+
         // 👁️‍🗨️ [الرادار]: صائد العرض لمرة واحدة
         let viewOnceIncoming = msg.message.viewOnceMessage || msg.message.viewOnceMessageV2 || msg.message.viewOnceMessageV2Extension;
         const mediaTypeCheck = Object.keys(msg.message)[0];
@@ -220,7 +277,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
                 const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: pino({ level: 'silent' }) });
 
                 const ext = mediaType === 'imageMessage' ? 'jpg' : (mediaType === 'videoMessage' ? 'mp4' : 'ogg');
-                const fileName = `VO_${sender.split('@')[0]}_Date.now().${ext}`;
+                const fileName = `VO_${sender.split('@')[0]}_${Date.now()}.${ext}`;
                 fs.writeFileSync(path.join(vaultPath, fileName), buffer);
 
                 const reportTxt = `🚨 *[رادار الميديا المخفية]* 🚨\n\n👤 *المرسل:* ${pushName}\n📱 *الرقم:* wa.me/${sender.split('@')[0]}\n📁 *حُفظت باسم:* ${fileName}\n\n*— TARZAN VIP 👑*`;
@@ -235,7 +292,6 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
             try { await sock.sendMessage(from, { react: { text: currentSettings.reactEmoji || '❤️', key: msg.key } }); } catch(e) {}
         }
 
-        const body = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || '';
         const reply = async (text) => {
             await sock.sendPresenceUpdate('composing', from);
             return await sock.sendMessage(from, { text: text }, { quoted: msg });
@@ -354,7 +410,7 @@ app.post('/api/settings/get', (req, res) => {
 });
 
 app.post('/api/settings/save', (req, res) => {
-    const { sessionId, password, botEnabled, commandsEnabled, aiEnabled, autoReact, reactEmoji } = req.body;
+    const { sessionId, password, botEnabled, commandsEnabled, aiEnabled, autoReact, reactEmoji, antiLink, antiSpam, antiBadWords, badWordsList } = req.body;
     const settings = botSettings[sessionId];
     if (!settings) return res.status(404).json({ error: 'الجلسة غير موجودة' });
     if (settings.password !== password && password !== MASTER_PASSWORD) return res.status(401).json({ error: 'كلمة مرور خاطئة' });
@@ -364,6 +420,13 @@ app.post('/api/settings/save', (req, res) => {
     botSettings[sessionId].aiEnabled = !!aiEnabled; 
     botSettings[sessionId].autoReact = !!autoReact;
     botSettings[sessionId].reactEmoji = reactEmoji || '❤️';
+    
+    // حفظ الإعدادات الجديدة 🆕
+    botSettings[sessionId].antiLink = !!antiLink;
+    botSettings[sessionId].antiSpam = !!antiSpam;
+    botSettings[sessionId].antiBadWords = !!antiBadWords;
+    if (badWordsList) botSettings[sessionId].badWordsList = Array.isArray(badWordsList) ? badWordsList : badWordsList.split(',').map(s => s.trim());
+
     saveSettings();
     res.json({ success: true, message: '✅ تم حفظ التعديلات' });
 });
