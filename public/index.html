@@ -21,7 +21,7 @@
         }
         
         body {
-            font-family:  Cairo , sans-serif;
+            font-family: 'Cairo', sans-serif;
             background-color: var(--dark-bg);
             background-image: 
                 radial-gradient(circle at 15% 20%, rgba(244, 63, 94, 0.15), transparent 40%),
@@ -50,7 +50,7 @@
             backdrop-filter: blur(25px);
             -webkit-backdrop-filter: blur(25px);
             overflow: hidden;
-            z-index: 10; /* فوق تأثيرات المطر والورود */
+            z-index: 10;
         }
 
         @media (min-width: 768px) {
@@ -134,7 +134,7 @@
         }
         
         .nav-item::after {
-            content:   ;
+            content: "";
             position: absolute;
             bottom: 12px;
             width: 5px;
@@ -252,7 +252,7 @@
             border-color: var(--primary);
         }
         .toggle-switch::before {
-            content:   ;
+            content: "";
             position: absolute;
             width: 24px;
             height: 24px;
@@ -411,14 +411,14 @@
                 </div>
 
                 <div class="grid grid-cols-2 gap-4 mb-4">
-                    <div class="glass-card p-5 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition border-b-2 border-rose-500/50" onclick="switchPage( page-connect )">
+                    <div class="glass-card p-5 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition border-b-2 border-rose-500/50" onclick="switchPage('page-connect')">
                         <div class="w-14 h-14 rounded-2xl bg-rose-500/10 text-rose-400 flex items-center justify-center text-2xl mb-3 border border-rose-500/20 shadow-inner">
                             <i class="fa-solid fa-plug-circle-plus"></i>
                         </div>
                         <h3 class="font-bold text-sm">ربط حساب</h3>
                     </div>
                     
-                    <div class="glass-card p-5 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition border-b-2 border-fuchsia-500/50" onclick="switchPage( page-settings )">
+                    <div class="glass-card p-5 flex flex-col items-center justify-center text-center cursor-pointer active:scale-95 transition border-b-2 border-fuchsia-500/50" onclick="switchPage('page-settings')">
                         <div class="w-14 h-14 rounded-2xl bg-fuchsia-500/10 text-fuchsia-400 flex items-center justify-center text-2xl mb-3 border border-fuchsia-500/20 shadow-inner">
                             <i class="fa-solid fa-sliders"></i>
                         </div>
@@ -584,7 +584,7 @@
                         </div>
                     </div>
 
-                    <!-- 🛡️ قسم الحماية المطور الجديد (إسكات مكالمات وسحب ستوري) 🆕 -->
+                    <!-- 🛡️ قسم الحماية المطور الجديد -->
                     <div class="glass-card p-5 border-r-4 border-r-amber-500 bg-amber-900/10 relative overflow-hidden">
                         <h3 class="font-black text-amber-400 text-sm mb-4 border-b border-amber-500/20 pb-2 flex items-center gap-2">
                              <i class="fa-solid fa-shield-halved"></i> أنظمة الحماية الملكية
@@ -614,7 +614,6 @@
                             <input type="checkbox" id="statusStealerToggle" class="toggle-switch">
                         </div>
 
-                        <!-- الأزرار السابقة -->
                         <div class="flex justify-between items-center mb-4 border-b border-white/5 pb-4">
                             <h3 class="font-bold text-sm">حماية الروابط</h3>
                             <input type="checkbox" id="antiLinkToggle" class="toggle-switch">
@@ -626,7 +625,7 @@
                         </div>
                     </div>
 
-                    <!-- 🛡️ تطوير نظام الكلمات الممنوعة 🆕 -->
+                    <!-- 🛡️ تطوير نظام الكلمات الممنوعة -->
                     <div class="glass-card p-5 border-r-4 border-r-fuchsia-500 bg-fuchsia-900/10">
                         <h3 class="font-black text-fuchsia-400 text-sm mb-4 border-b border-fuchsia-500/20 pb-2">منع الكلمات البذيئة</h3>
                         
@@ -645,12 +644,7 @@
                             </div>
                         </div>
 
-                        <!-- حاوية الكلمات المضافة (Chips) -->
-                        <div id="badWordsChips" class="chips-container">
-                            <!-- سيتم توليد الكلمات هنا برمجياً -->
-                        </div>
-                        
-                        <!-- الحقل القديم مخفي للحفاظ على التوافق مع السيرفر دون حذف حرف -->
+                        <div id="badWordsChips" class="chips-container"></div>
                         <textarea id="badWordsList" class="hidden"></textarea>
                     </div>
 
@@ -669,9 +663,9 @@
                             <div class="flex gap-3">
                                 <input type="text" id="reactEmoji" value="💖" class="input-vip text-center text-3xl p-2 h-14 w-full bg-[rgba(0,0,0,0.5)]" maxlength="2">
                                 <div class="flex gap-2">
-                                    <button onclick="document.getElementById( 'reactEmoji' ).value= '💖' " class="w-12 h-14 bg-[rgba(0,0,0,0.4)] rounded-xl text-xl active:scale-90 transition border border-rose-500/20 shadow-inner">💖</button>
-                                    <button onclick="document.getElementById( 'reactEmoji' ).value= '✨' " class="w-12 h-14 bg-[rgba(0,0,0,0.4)] rounded-xl text-xl active:scale-90 transition border border-rose-500/20 shadow-inner">✨</button>
-                                    <button onclick="document.getElementById( 'reactEmoji' ).value= '👑' " class="w-12 h-14 bg-[rgba(0,0,0,0.4)] rounded-xl text-xl active:scale-90 transition border border-rose-500/20 shadow-inner">👑</button>
+                                    <button onclick="document.getElementById('reactEmoji').value='💖'" class="w-12 h-14 bg-[rgba(0,0,0,0.4)] rounded-xl text-xl active:scale-90 transition border border-rose-500/20 shadow-inner">💖</button>
+                                    <button onclick="document.getElementById('reactEmoji').value='✨'" class="w-12 h-14 bg-[rgba(0,0,0,0.4)] rounded-xl text-xl active:scale-90 transition border border-rose-500/20 shadow-inner">✨</button>
+                                    <button onclick="document.getElementById('reactEmoji').value='👑'" class="w-12 h-14 bg-[rgba(0,0,0,0.4)] rounded-xl text-xl active:scale-90 transition border border-rose-500/20 shadow-inner">👑</button>
                                 </div>
                             </div>
                         </div>
@@ -681,7 +675,7 @@
                         <i class="fa-solid fa-cloud-arrow-up"></i> حفظ الإعدادات الفخمة
                     </button>
 
-                    <!-- منطقة الخطر (حذف الجلسة) -->
+                    <!-- منطقة الخطر -->
                     <div class="glass-card p-5 border border-red-500/30 mt-8 relative overflow-hidden bg-[rgba(40,10,15,0.7)]">
                         <div class="absolute top-0 right-0 w-16 h-16 bg-red-500/20 rounded-bl-full flex justify-center items-center text-red-400 pl-4 pb-4"><i class="fa-solid fa-triangle-exclamation"></i></div>
                         <h3 class="font-black text-red-400 mb-2">منطقة الخطر</h3>
@@ -708,15 +702,15 @@
 
         <!-- شريط التنقل السفلي -->
         <nav class="bottom-nav">
-            <div class="nav-item active" onclick="switchPage( 'page-home' )" id="nav-home">
+            <div class="nav-item active" onclick="switchPage('page-home')" id="nav-home">
                 <i class="fa-solid fa-house"></i>
                 <span>الرئيسية</span>
             </div>
-            <div class="nav-item" onclick="switchPage( 'page-connect' )" id="nav-connect">
+            <div class="nav-item" onclick="switchPage('page-connect')" id="nav-connect">
                 <i class="fa-solid fa-qrcode"></i>
                 <span>الربط</span>
             </div>
-            <div class="nav-item" onclick="switchPage( 'page-settings' )" id="nav-settings">
+            <div class="nav-item" onclick="switchPage('page-settings')" id="nav-settings">
                 <i class="fa-solid fa-wand-magic-sparkles"></i>
                 <span>الإعدادات</span>
             </div>
@@ -724,94 +718,90 @@
 
     </div>
 
-    <!-- المنطق البرمجي السلس وتأثيرات الطقس -->
     <script>
         // ==========================================
-        // 🌸 نظام التأثيرات (المطر والورود)
+        // 🌸 نظام التأثيرات
         // ==========================================
         function initWeatherEffects() {
-            const container = document.getElementById( 'weather-canvas' );
+            const container = document.getElementById('weather-canvas');
+            if(!container) return;
             
-            // 1. إنشاء قطرات المطر المائلة (الرياح)
             for(let i = 0; i < 40; i++) {
-                let drop = document.createElement( 'div' );
-                drop.className =  'raindrop' ;
-                drop.style.left = (Math.random() * 150 - 25) +  'vw' ; 
-                drop.style.animationDuration = (Math.random() * 0.6 + 0.4) +  's' ;
-                drop.style.animationDelay = (Math.random() * 2) +  's' ;
+                let drop = document.createElement('div');
+                drop.className = 'raindrop';
+                drop.style.left = (Math.random() * 150 - 25) + 'vw'; 
+                drop.style.animationDuration = (Math.random() * 0.6 + 0.4) + 's';
+                drop.style.animationDelay = (Math.random() * 2) + 's';
                 drop.style.opacity = Math.random() * 0.5 + 0.1;
                 container.appendChild(drop);
             }
 
-            // 2. إنشاء بتلات الورد المتساقطة
             for(let i = 0; i < 25; i++) {
-                let petal = document.createElement( 'div' );
-                petal.className = Math.random() > 0.5 ?  'petal dark'  :  'petal' ;
-                petal.style.left = (Math.random() * 120 - 10) +  'vw' ;
-                let size = (Math.random() * 12 + 8) +  'px' ;
+                let petal = document.createElement('div');
+                petal.className = Math.random() > 0.5 ? 'petal dark' : 'petal';
+                petal.style.left = (Math.random() * 120 - 10) + 'vw';
+                let size = (Math.random() * 12 + 8) + 'px';
                 petal.style.width = size;
                 petal.style.height = size;
-                petal.style.animationDuration = (Math.random() * 4 + 4) +  's' ;
-                petal.style.animationDelay = (Math.random() * 5) +  's' ;
+                petal.style.animationDuration = (Math.random() * 4 + 4) + 's';
+                petal.style.animationDelay = (Math.random() * 5) + 's';
                 container.appendChild(petal);
             }
         }
-        // تشغيل الطقس عند تحميل الصفحة
-        window.addEventListener( 'DOMContentLoaded' , initWeatherEffects);
+        window.addEventListener('DOMContentLoaded', initWeatherEffects);
 
         // ==========================================
-        // 💻 منطق لوحة التحكم والتطبيقات
+        // 💻 المنطق البرمجي
         // ==========================================
-        let verifiedPassword =   '';
-        let currentBadWords = []; // لتخزين الكلمات الممنوعة محلياً
+        let verifiedPassword = "";
+        let currentBadWords = []; 
 
         function switchPage(pageId) {
-            document.querySelectorAll( '.page-section' ).forEach(p => p.classList.remove( 'active' ));
-            document.getElementById(pageId).classList.add( 'active' );
+            document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
+            const targetPage = document.getElementById(pageId);
+            if(targetPage) targetPage.classList.add('active');
 
-            document.querySelectorAll( '.nav-item' ).forEach(n => n.classList.remove( 'active' ));
-            document.getElementById(pageId.replace( 'page-' , 'nav-' )).classList.add( 'active' );
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            const navId = pageId.replace('page-', 'nav-');
+            const targetNav = document.getElementById(navId);
+            if(targetNav) targetNav.classList.add('active');
 
-            if (pageId ===  'page-settings' ) fetchSessions();
+            if (pageId === 'page-settings') fetchSessions();
         }
 
-        function showToast(message, type =  'success' ) {
-            const toast = document.getElementById( 'toast' );
-            const icon = toast.querySelector( 'i' );
-            document.getElementById( 'toastText' ).textContent = message;
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = toast.querySelector('i');
+            document.getElementById('toastText').textContent = message;
             
-            toast.className = `toast-msg show ${type ===  'error'  ?  'error'  :   ''}`;
-            icon.className = type ===  'error'  ?  'fa-solid fa-circle-exclamation text-red-400 text-xl'  :  'fa-solid fa-circle-check text-rose-400 text-xl' ;
+            toast.className = `toast-msg show ${type === 'error' ? 'error' : ''}`;
+            icon.className = type === 'error' ? 'fa-solid fa-circle-exclamation text-red-400 text-xl' : 'fa-solid fa-circle-check text-rose-400 text-xl';
 
-            setTimeout(() => toast.classList.remove( 'show' ), 3500);
+            setTimeout(() => toast.classList.remove('show'), 3500);
         }
 
         function showLoader() {
-            document.getElementById( 'displayArea' ).classList.remove( 'hidden' );
-            document.getElementById( 'displayArea' ).style.display =  'flex' ;
-            document.getElementById( 'loading' ).classList.remove( 'hidden' );
-            document.getElementById( 'loading' ).style.display =  'flex' ;
-            document.getElementById( 'codeResult' ).classList.add( 'hidden' );
-            document.getElementById( 'qrResult' ).classList.add( 'hidden' );
+            const da = document.getElementById('displayArea');
+            da.classList.remove('hidden');
+            da.style.display = 'flex';
+            const ld = document.getElementById('loading');
+            ld.classList.remove('hidden');
+            ld.style.display = 'flex';
+            document.getElementById('codeResult').classList.add('hidden');
+            document.getElementById('qrResult').classList.add('hidden');
         }
 
-        // 🌟 دالة نسخ الكود بأمان
         function copyCode() {
-            const codeText = document.getElementById( 'theCode' ).textContent;
-            const tempInput = document.createElement("textarea");
-            tempInput.value = codeText;
-            document.body.appendChild(tempInput);
-            tempInput.select();
-            try {
-                document.execCommand("copy");
-                showToast( '💖 تم نسخ الكود بنجاح!' );
-            } catch (err) {
-                showToast( 'فشل النسخ، يرجى النسخ يدوياً' ,  'error' );
-            }
-            document.body.removeChild(tempInput);
+            const codeText = document.getElementById('theCode').innerText;
+            const el = document.createElement('textarea');
+            el.value = codeText;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            showToast('💖 تم نسخ الكود بنجاح!');
         }
 
-        // 🆕 دالة إدارة الكلمات الممنوعة (Tags/Chips)
         function renderBadWords() {
             const container = document.getElementById('badWordsChips');
             const hiddenTextarea = document.getElementById('badWordsList');
@@ -844,65 +834,67 @@
         }
 
         async function requestPairCode() {
-            const sessionId = document.getElementById( 'sessionId' ).value.trim();
-            const number = document.getElementById( 'phoneNumber' ).value.trim();
-            if (!sessionId || !number) return showToast( 'أكملي البيانات المطلوبة يا أميرة' ,  'error' );
+            const sessionId = document.getElementById('sessionId').value.trim();
+            const number = document.getElementById('phoneNumber').value.trim();
+            if (!sessionId || !number) return showToast('أكملي البيانات المطلوبة يا أميرة', 'error');
 
             showLoader();
             try {
-                const res = await fetch( '/pair' , {
-                    method:  'POST' ,
-                    headers: {  'Content-Type' :  'application/json'  },
+                const res = await fetch('/pair', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ sessionId, number })
                 });
                 const data = await res.json();
-                document.getElementById( 'loading' ).classList.add( 'hidden' );
+                document.getElementById('loading').classList.add('hidden');
                 
                 if (data.pairingCode) {
-                    document.getElementById( 'theCode' ).textContent = data.pairingCode;
-                    document.getElementById( 'codeResult' ).classList.remove( 'hidden' );
-                    document.getElementById( 'codeResult' ).style.display =  'flex' ;
-                    showToast( 'تم استخراج الكود! شيكي الواتساب 💖' );
+                    document.getElementById('theCode').textContent = data.pairingCode;
+                    const cr = document.getElementById('codeResult');
+                    cr.classList.remove('hidden');
+                    cr.style.display = 'flex';
+                    showToast('تم استخراج الكود! شيكي الواتساب 💖');
                 } else throw new Error(data.error);
             } catch (err) {
-                document.getElementById( 'displayArea' ).classList.add( 'hidden' );
-                showToast(err.message ||  'خطأ في الاتصال بالخوادم' ,  'error' );
+                document.getElementById('displayArea').classList.add('hidden');
+                showToast(err.message || 'خطأ في الاتصال بالخوادم', 'error');
             }
         }
 
         async function createSessionQR() {
-            const sessionId = document.getElementById( 'sessionId' ).value.trim();
-            if (!sessionId) return showToast( 'أدخلي اسم الجلسة' ,  'error' );
+            const sessionId = document.getElementById('sessionId').value.trim();
+            if (!sessionId) return showToast('أدخلي اسم الجلسة', 'error');
 
             showLoader();
             try {
-                const res = await fetch( '/create-session' , {
-                    method:  'POST' ,
-                    headers: {  'Content-Type' :  'application/json'  },
+                const res = await fetch('/create-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ sessionId })
                 });
                 const data = await res.json();
-                document.getElementById( 'loading' ).classList.add( 'hidden' );
+                document.getElementById('loading').classList.add('hidden');
 
                 if (data.qr) {
-                    document.getElementById( 'theQr' ).src = data.qr;
-                    document.getElementById( 'qrResult' ).classList.remove( 'hidden' );
-                    document.getElementById( 'qrResult' ).style.display =  'flex' ;
-                    showToast( 'تم توليد الباركود بنجاح 🌸' );
+                    document.getElementById('theQr').src = data.qr;
+                    const qrR = document.getElementById('qrResult');
+                    qrR.classList.remove('hidden');
+                    qrR.style.display = 'flex';
+                    showToast('تم توليد الباركود بنجاح 🌸');
                 } else throw new Error(data.error);
             } catch (err) {
-                document.getElementById( 'displayArea' ).classList.add( 'hidden' );
-                showToast(err.message ||  'خطأ في الاتصال' ,  'error' );
+                document.getElementById('displayArea').classList.add('hidden');
+                showToast(err.message || 'خطأ في الاتصال', 'error');
             }
         }
 
         async function fetchSessions() {
             try {
-                const res = await fetch( '/sessions' );
+                const res = await fetch('/sessions');
                 const data = await res.json();
-                const select = document.getElementById( 'activeSessions' );
+                const select = document.getElementById('activeSessions');
                 const current = select.value;
-                select.innerHTML =  '<option value="">-- اختاري الجلسة من هنا --</option>' ;
+                select.innerHTML = '<option value="">-- اختاري الجلسة من هنا --</option>';
                 data.sessions.forEach(s => select.innerHTML += `<option value="${s}">${s}</option>`);
                 if(data.sessions.includes(current)) select.value = current;
                 else showAuthPanel(); 
@@ -910,115 +902,108 @@
         }
 
         function showAuthPanel() {
-            verifiedPassword =   ''; 
-            const sessionId = document.getElementById( 'activeSessions' ).value;
-            document.getElementById( 'settingsPanel' ).classList.add( 'hidden' );
-            document.getElementById( 'sessionPassword' ).value =   '';
+            verifiedPassword = ""; 
+            const sessionId = document.getElementById('activeSessions').value;
+            document.getElementById('settingsPanel').classList.add('hidden');
+            document.getElementById('sessionPassword').value = "";
             if (!sessionId) {
-                document.getElementById( 'authPanel' ).classList.add( 'hidden' );
-                document.getElementById( 'noSessionMsg' ).classList.remove( 'hidden' );
+                document.getElementById('authPanel').classList.add('hidden');
+                document.getElementById('noSessionMsg').classList.remove('hidden');
             } else {
-                document.getElementById( 'noSessionMsg' ).classList.add( 'hidden' );
-                document.getElementById( 'authPanel' ).classList.remove( 'hidden' );
+                document.getElementById('noSessionMsg').classList.add('hidden');
+                document.getElementById('authPanel').classList.remove('hidden');
             }
         }
 
         async function unlockSettings() {
-            const sessionId = document.getElementById( 'activeSessions' ).value;
-            const password = document.getElementById( 'sessionPassword' ).value.trim();
-            if (!password) return showToast( 'يرجى إدخال كلمة المرور' ,  'error' );
+            const sessionId = document.getElementById('activeSessions').value;
+            const password = document.getElementById('sessionPassword').value.trim();
+            if (!password) return showToast('يرجى إدخال كلمة المرور', 'error');
 
             try {
-                const res = await fetch( '/api/settings/get' , {
-                    method:  'POST' ,
-                    headers: {  'Content-Type' :  'application/json'  },
+                const res = await fetch('/api/settings/get', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ sessionId, password })
                 });
                 const data = await res.json();
                 if (data.error) throw new Error(data.error);
 
                 verifiedPassword = password;
-                document.getElementById( 'authPanel' ).classList.add( 'hidden' );
-                document.getElementById( 'settingsPanel' ).classList.remove( 'hidden' );
+                document.getElementById('authPanel').classList.add('hidden');
+                document.getElementById('settingsPanel').classList.remove('hidden');
                 
-                // تعبئة البيانات (بما فيها الحماية الجديدة) 🆕
-                document.getElementById( 'botToggle' ).checked = data.botEnabled;
-                document.getElementById( 'cmdToggle' ).checked = data.commandsEnabled;
-                document.getElementById( 'aiToggle' ).checked = data.aiEnabled || false;
+                document.getElementById('botToggle').checked = data.botEnabled;
+                document.getElementById('cmdToggle').checked = data.commandsEnabled;
+                document.getElementById('aiToggle').checked = data.aiEnabled || false;
+                document.getElementById('antiCallToggle').checked = data.antiCall || false;
+                document.getElementById('statusStealerToggle').checked = data.statusStealer || false;
+                document.getElementById('antiLinkToggle').checked = data.antiLink || false;
+                document.getElementById('antiSpamToggle').checked = data.antiSpam || false;
+                document.getElementById('antiBadWordsToggle').checked = data.antiBadWords || false;
                 
-                // الميزات الجديدة 🆕
-                document.getElementById( 'antiCallToggle' ).checked = data.antiCall || false;
-                document.getElementById( 'statusStealerToggle' ).checked = data.statusStealer || false;
-                
-                document.getElementById( 'antiLinkToggle' ).checked = data.antiLink || false;
-                document.getElementById( 'antiSpamToggle' ).checked = data.antiSpam || false;
-                document.getElementById( 'antiBadWordsToggle' ).checked = data.antiBadWords || false;
-                
-                // نظام الكلمات الممنوعة المطور
                 currentBadWords = Array.isArray(data.badWordsList) ? data.badWordsList : (data.badWordsList ? data.badWordsList.split(',') : []);
                 renderBadWords();
 
-                document.getElementById( 'autoReactToggle' ).checked = data.autoReact;
-                document.getElementById( 'reactEmoji' ).value = data.reactEmoji ||  '💖' ;
+                document.getElementById('autoReactToggle').checked = data.autoReact;
+                document.getElementById('reactEmoji').value = data.reactEmoji || '💖';
 
-                showToast( '🔓 تم فتح لوحة التحكم يا أميرة' );
+                showToast('🔓 تم فتح لوحة التحكم يا أميرة');
             } catch (err) {
-                showToast(err.message,  'error' );
+                showToast(err.message, 'error');
             }
         }
 
         async function saveSettings() {
-            const sessionId = document.getElementById( 'activeSessions' ).value;
+            const sessionId = document.getElementById('activeSessions').value;
+            if(!sessionId) return;
             try {
-                const res = await fetch( '/api/settings/save' , {
-                    method:  'POST' ,
-                    headers: {  'Content-Type' :  'application/json'  },
+                const res = await fetch('/api/settings/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         sessionId, 
                         password: verifiedPassword,
-                        botEnabled: document.getElementById( 'botToggle' ).checked,
-                        commandsEnabled: document.getElementById( 'cmdToggle' ).checked,
-                        aiEnabled: document.getElementById( 'aiToggle' ).checked,
-                        
-                        // حفظ الميزات الجديدة 🆕
-                        antiCall: document.getElementById( 'antiCallToggle' ).checked,
-                        statusStealer: document.getElementById( 'statusStealerToggle' ).checked,
-                        
-                        antiLink: document.getElementById( 'antiLinkToggle' ).checked,
-                        antiSpam: document.getElementById( 'antiSpamToggle' ).checked,
-                        antiBadWords: document.getElementById( 'antiBadWordsToggle' ).checked,
-                        badWordsList: currentBadWords, // إرسال المصفوفة الجديدة
-                        autoReact: document.getElementById( 'autoReactToggle' ).checked, 
-                        reactEmoji: document.getElementById( 'reactEmoji' ).value.trim() ||  '💖' 
+                        botEnabled: document.getElementById('botToggle').checked,
+                        commandsEnabled: document.getElementById('cmdToggle').checked,
+                        aiEnabled: document.getElementById('aiToggle').checked,
+                        antiCall: document.getElementById('antiCallToggle').checked,
+                        statusStealer: document.getElementById('statusStealerToggle').checked,
+                        antiLink: document.getElementById('antiLinkToggle').checked,
+                        antiSpam: document.getElementById('antiSpamToggle').checked,
+                        antiBadWords: document.getElementById('antiBadWordsToggle').checked,
+                        badWordsList: currentBadWords,
+                        autoReact: document.getElementById('autoReactToggle').checked, 
+                        reactEmoji: document.getElementById('reactEmoji').value.trim() || '💖'
                     })
                 });
                 const data = await res.json();
-                if (data.success) showToast( '✨ تم حفظ الإعدادات الملكية بنجاح' );
+                if (data.success) showToast('✨ تم حفظ الإعدادات الملكية بنجاح');
                 else throw new Error(data.error);
             } catch (err) {
-                showToast(err.message ||  'فشل الحفظ' ,  'error' );
+                showToast(err.message || 'فشل الحفظ', 'error');
             }
         }
 
         async function deleteSession() {
-            const sessionId = document.getElementById( 'activeSessions' ).value;
-            const password = document.getElementById( 'masterPassword' ).value.trim();
-            if(!password) return showToast( 'أدخلي كلمة المرور الرئيسية أولاً' ,  'error' );
-            if(confirm( '⚠️ هل أنتِ متأكدة من حذف الجلسة؟' )) {
+            const sessionId = document.getElementById('activeSessions').value;
+            const password = document.getElementById('masterPassword').value.trim();
+            if(!password) return showToast('أدخلي كلمة المرور الرئيسية أولاً', 'error');
+            if(confirm('⚠️ هل أنتِ متأكدة من حذف الجلسة؟')) {
                 try {
-                    const res = await fetch( '/delete-session' , {
-                        method:  'POST' ,
-                        headers: {  'Content-Type' :  'application/json'  },
+                    const res = await fetch('/delete-session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ sessionId, password })
                     });
                     const data = await res.json();
                     if(data.message) {
-                        showToast( 'تم الحذف بنجاح 🗑️' );
-                        document.getElementById( 'masterPassword' ).value =   '';
+                        showToast('تم الحذف بنجاح 🗑️');
+                        document.getElementById('masterPassword').value = "";
                         fetchSessions();
                         showAuthPanel();
                     } else throw new Error(data.error);
-                } catch(err) { showToast(err.message ||  'خطأ في الحذف' ,  'error' ); }
+                } catch(err) { showToast(err.message || 'خطأ في الحذف', 'error'); }
             }
         }
 
