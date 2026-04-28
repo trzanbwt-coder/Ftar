@@ -1,30 +1,88 @@
+const yts = require('yt-search');
 const axios = require('axios');
 
 module.exports = {
-    name: 'blackcard',
-    aliases: ['بطاقة', 'فيزا', 'عضوية'],
-    execute: async ({ sock, msg, args, text, reply, from }) => {
-        if (!text) return reply('❌ *يرجى كتابة اسمك لإصدار البطاقة.*\n*مثال:* `.بطاقة محمد`');
+    name: 'yt',
+    aliases: ['تحميل', 'فيديو', 'صوت', 'play', 'video', 'song'],
+    async execute({ sock, msg, text, reply, from, commandName }) {
+        // التأكد من وجود نص للبحث
+        if (!text) {
+            return await reply('⚠️ يرجى كتابة اسم المقطع أو رابط اليوتيوب.\n\nمثال:\n```.صوت قران كريم```\n```.فيديو اغنية حزينة```');
+        }
 
         try {
-            await sock.sendMessage(from, { react: { text: '💳', key: msg.key } });
-            await reply('⏳ *جاري إصدار بطاقة Tarzan VIP Black Card...*');
+            // التفاعل لبدء البحث
+            await sock.sendMessage(from, { react: { text: '🔍', key: msg.key } });
 
-            // استخدام API يولد تصميم فخم
-            const apiUrl = `https://api.popcat.xyz/biden?text=${encodeURIComponent('TARZAN VIP MEMBER: ' + text)}`;
+            const search = await yts(text);
+            if (!search.videos || search.videos.length === 0) {
+                await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
+                return await reply(`❌ لم يتم العثور على نتائج لـ: ${text}`);
+            }
+
+            const video = search.videos[0];
+            const ytUrl = video.url;
+            const title = video.title;
+            const thumb = video.thumbnail;
+
+            // تحديد هل المستخدم يريد فيديو أم صوت بناءً على الأمر المستخدم
+            const isVideo = commandName === 'فيديو' || commandName === 'video';
             
-            const response = await axios.get(apiUrl, { responseType: 'arraybuffer' });
-            const imageBuffer = Buffer.from(response.data, 'binary');
+            await sock.sendMessage(from, { react: { text: '📥', key: msg.key } });
 
-            await sock.sendMessage(from, { 
-                image: imageBuffer, 
-                caption: `💳 *تـم إصـدار بـطـاقـتـك الـمـلـكـيـة يـا [ ${text} ]*\n*حـافـظ عـلـيـهـا.* \n*— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑽𝑰𝑷 👑*`
-            }, { quoted: msg });
+            // إرسال صورة المقطع وتفاصيله
+            const infoText = `🚀 *جاري التحميل من اليوتيوب* 🚀\n\n📝 *العنوان:* ${title}\n⏳ *المدة:* ${video.timestamp}\n👀 *المشاهدات:* ${video.views}\n🎬 *النوع:* ${isVideo ? 'فيديو (MP4)' : 'صوت (MP3)'}\n\n*— 𝑻𝑨𝑹𝒁𝑨𝑵 𝑩𝑶𝑻 ⚔️*`;
+            await sock.sendMessage(from, { image: { url: thumb }, caption: infoText }, { quoted: msg });
+
+            // استخدام API لجلب روابط التحميل المباشرة (الملفات الفعلية)
+            // ملاحظة: هذا الـ API يقوم بتحويل الفيديو إلى ملف فعلي للتحميل
+            const apiType = isVideo ? 'mp4' : 'mp3';
+            const apiUrl = `https://api.aggelos-007.xyz/yt${apiType}?url=${encodeURIComponent(ytUrl)}`;
+            
+            const response = await axios.get(apiUrl);
+
+            if (!response.data || !response.data.status) {
+                throw new Error('فشل جلب الملف من السيرفر');
+            }
+
+            const fileUrl = response.data.download_url;
+
+            await sock.sendMessage(from, { react: { text: isVideo ? '🎬' : '🎶', key: msg.key } });
+
+            if (isVideo) {
+                // إرسال فيديو فعلي (MP4)
+                await sock.sendMessage(from, {
+                    video: { url: fileUrl },
+                    caption: `✅ تم تحميل الفيديو بنجاح: ${title}`,
+                    mimetype: 'video/mp4',
+                    fileName: `${title}.mp4`
+                }, { quoted: msg });
+            } else {
+                // إرسال ملف صوتي فعلي (MP3)
+                await sock.sendMessage(from, {
+                    audio: { url: fileUrl },
+                    mimetype: 'audio/mpeg',
+                    fileName: `${title}.mp3`,
+                    ptt: false,
+                    contextInfo: {
+                        externalAdReply: {
+                            title: title,
+                            body: `طرزان VIP | جودة عالية ✨`,
+                            thumbnailUrl: thumb,
+                            sourceUrl: ytUrl,
+                            mediaType: 1,
+                            renderLargerThumbnail: true
+                        }
+                    }
+                }, { quoted: msg });
+            }
 
             await sock.sendMessage(from, { react: { text: '✅', key: msg.key } });
 
         } catch (error) {
-            reply('❌ *فشل إصدار البطاقة.*');
+            console.error('YT Download Error:', error.message);
+            await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
+            await reply('❌ حدث خطأ أثناء تحميل الملف. السيرفر قد يكون مشغولاً، حاول لاحقاً.');
         }
     }
 };
